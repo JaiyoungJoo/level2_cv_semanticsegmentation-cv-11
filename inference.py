@@ -12,6 +12,7 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 
 import argparse
+import dataset
 
 # csv 저장명 중복 확인
 def exist_csv(filename):
@@ -56,35 +57,6 @@ def decode_rle_to_mask(rle, height, width):
     
     return img.reshape(height, width)
 
-class XRayInferenceDataset(Dataset):
-    def __init__(self, transforms=None):
-        _filenames = pngs
-        _filenames = np.array(sorted(_filenames))
-        
-        self.filenames = _filenames
-        self.transforms = transforms
-    
-    def __len__(self):
-        return len(self.filenames)
-    
-    def __getitem__(self, item):
-        image_name = self.filenames[item]
-        image_path = os.path.join(IMAGE_ROOT, image_name)
-        
-        image = cv2.imread(image_path)
-        image = image / 255.
-        
-        if self.transforms is not None:
-            inputs = {"image": image}
-            result = self.transforms(**inputs)
-            image = result["image"]
-
-        # to tenser will be done later
-        image = image.transpose(2, 0, 1)    # make channel first
-        
-        image = torch.from_numpy(image).float()
-            
-        return image, image_name
 
 def test(model, data_loader, thr=0.5):
     model = model.cuda()
@@ -117,7 +89,7 @@ def main():
 
     tf = A.Resize(512, 512)
 
-    test_dataset = XRayInferenceDataset(transforms=tf)
+    test_dataset = dataset.XRayInferenceDataset(transforms=tf)
 
     test_loader = DataLoader(
         dataset=test_dataset, 
@@ -178,13 +150,6 @@ if __name__ == '__main__':
     
     MODEL_NAME = MODEL_ROOT.split('/')[-1].split('.')[0] # 절대 경로 제거
     MODEL_NAME = MODEL_NAME.replace('_best_model', '')
-    
-    pngs = {
-        os.path.relpath(os.path.join(root, fname), start=IMAGE_ROOT)
-        for root, _dirs, files in os.walk(IMAGE_ROOT)
-        for fname in files
-        if os.path.splitext(fname)[1].lower() == ".png"
-    }
     
     main()
     
