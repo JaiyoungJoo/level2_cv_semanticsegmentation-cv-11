@@ -10,6 +10,7 @@ import torch
 # 데이터 경로를 입력하세요
 IMAGE_ROOT = "/opt/ml/input/data/train/DCM/"
 LABEL_ROOT = "/opt/ml/input/data/train/outputs_json/"
+TEST_ROOT = "/opt/ml/input/data/test/DCM/"
 
 CLASSES = [
     'finger-1', 'finger-2', 'finger-3', 'finger-4', 'finger-5',
@@ -30,28 +31,31 @@ def check_size_of_dataset(IMAGE_ROOT, LABEL_ROOT):
         for fname in files
         if os.path.splitext(fname)[1].lower() == ".png"
         }
-
-    jsons = {
-        os.path.relpath(os.path.join(root, fname), start=LABEL_ROOT)
-        for root, _dirs, files in os.walk(LABEL_ROOT)
-        for fname in files
-        if os.path.splitext(fname)[1].lower() == ".json"
-        }
-
-    jsons_fn_prefix = {os.path.splitext(fname)[0] for fname in jsons}
+    if LABEL_ROOT:
+        jsons = {
+            os.path.relpath(os.path.join(root, fname), start=LABEL_ROOT)
+            for root, _dirs, files in os.walk(LABEL_ROOT)
+            for fname in files
+            if os.path.splitext(fname)[1].lower() == ".json"
+            }
+        jsons_fn_prefix = {os.path.splitext(fname)[0] for fname in jsons}
     pngs_fn_prefix = {os.path.splitext(fname)[0] for fname in pngs}
 
-    assert len(jsons_fn_prefix - pngs_fn_prefix) == 0
-    assert len(pngs_fn_prefix - jsons_fn_prefix) == 0
+    if LABEL_ROOT:
+        assert len(jsons_fn_prefix - pngs_fn_prefix) == 0
+        assert len(pngs_fn_prefix - jsons_fn_prefix) == 0
+        jsons = sorted(jsons)
 
     pngs = sorted(pngs)
-    jsons = sorted(jsons)
 
-    return pngs, jsons
+    if LABEL_ROOT:
+        return pngs, jsons
+    else:
+        return pngs
 
 class XRayInferenceDataset(Dataset):
     def __init__(self, transforms=None):
-        pngs, jsons = check_size_of_dataset(IMAGE_ROOT, LABEL_ROOT)
+        pngs = check_size_of_dataset(TEST_ROOT, False)
         
         _filenames = pngs
         _filenames = np.array(sorted(_filenames))
@@ -64,7 +68,7 @@ class XRayInferenceDataset(Dataset):
     
     def __getitem__(self, item):
         image_name = self.filenames[item]
-        image_path = os.path.join(IMAGE_ROOT, image_name)
+        image_path = os.path.join(TEST_ROOT, image_name)
         
         image = cv2.imread(image_path)
         image = image / 255.
