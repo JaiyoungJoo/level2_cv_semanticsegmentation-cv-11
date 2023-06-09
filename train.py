@@ -37,7 +37,6 @@ CLASSES = [
 
 def check_path(path):
     # 가중치 저장 경로 설정
-    # SAVED_DIR = "/opt/ml/input/code/results_baseline/"
     if not os.path.isdir(path):                                                           
         os.mkdir(path)
 
@@ -74,7 +73,8 @@ def dice_coef(y_true, y_pred):
     return (2. * intersection + eps) / (torch.sum(y_true_f, -1) + torch.sum(y_pred_f, -1) + eps)
 
 def save_model(model, args, epoch):
-    output_path = os.path.join(args.save_dir, f"{args.model}_{args.epochs}_{epoch}.pt")    #아래의 wandb쪽의 name과 동시 수정할것
+    
+    output_path = os.path.join(args.save_dir, f"{args.model}_{args.epochs}.pt")    #아래의 wandb쪽의 name과 동시 수정할것
     torch.save(model, output_path)
 
 def set_seed(seed):
@@ -194,16 +194,14 @@ def train(model, data_loader, val_loader, criterion, optimizer, args):
                 print(f"Best performance at epoch: {epoch + 1}, {best_dice:.4f} -> {dice:.4f}")
                 print(f"Save model in {args.save_dir}")
                 best_dice = dice
-                save_model(model, args, epoch+1)
+                save_model(model, args)
 
 
 def main(args):
-    # Loss function 정의
     criterion = nn.BCEWithLogitsLoss()
-    # model = FCN()
     model = getattr(import_module("model"), args.model)(encoder = args.encoder)
-    # Optimizer 정의
     optimizer = optim.Adam(params=model.parameters(), lr=LR, weight_decay=1e-6)
+
     set_seed(args.seed)
     check_path(args.save_dir)
     train_loader, valid_loader = make_dataset()
@@ -222,6 +220,7 @@ if __name__ == '__main__':
     parser.add_argument("--save_dir", type=str, default="/opt/ml/weights/")
 
     args = parser.parse_args()
-    print(args)
+    args.save_dir = os.path.join(args.save_dir, args.model)
 
+    print(args)
     main(args)
