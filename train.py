@@ -12,6 +12,7 @@ import pandas as pd
 from tqdm.auto import tqdm
 from sklearn.model_selection import GroupKFold
 import albumentations as A
+import segmentation_models_pytorch as smp
 
 # torch
 import torch
@@ -20,6 +21,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 from torchvision import models
+
 
 # visualization
 import matplotlib.pyplot as plt
@@ -51,7 +53,7 @@ LR = 1e-4
 RANDOM_SEED = 21
 
 NUM_EPOCHS = 100    # CHANGE
-VAL_EVERY = 1
+VAL_EVERY = 5       #Caution!
 
 SAVED_DIR = "/opt/ml/input/code/results_baseline/"
 
@@ -183,7 +185,7 @@ valid_loader = DataLoader(
     dataset=valid_dataset, 
     batch_size=2,
     shuffle=False,
-    num_workers=2,
+    num_workers=0,
     drop_last=False
 )
 
@@ -214,7 +216,7 @@ wandb.init(config={'batch_size':BATCH_SIZE,
                    'max_epoch':NUM_EPOCHS},
            project='Segmentation',
            entity='aivengers_seg',
-           name=f'baseline_epoch={NUM_EPOCHS}'
+           name=f'smp_resnet_baseline_epoch={NUM_EPOCHS}'
           )
 
 def validation(epoch, model, data_loader, criterion, thr=0.5):
@@ -231,7 +233,7 @@ def validation(epoch, model, data_loader, criterion, thr=0.5):
             images, masks = images.cuda(), masks.cuda()         
             model = model.cuda()
             
-            outputs = model(images)['out']
+            outputs = model(images)
             
             output_h, output_w = outputs.size(-2), outputs.size(-1)
             mask_h, mask_w = masks.size(-2), masks.size(-1)
@@ -278,7 +280,7 @@ def train(model, data_loader, val_loader, criterion, optimizer):
             model = model.cuda()
             
             # inference
-            outputs = model(images)['out']
+            outputs = model(images)
             
             # loss 계산
             loss = criterion(outputs, masks)
@@ -311,9 +313,19 @@ def train(model, data_loader, val_loader, criterion, optimizer):
 
 
 def main():
-    model = models.segmentation.fcn_resnet50(pretrained=True)
-    # output class를 data set에 맞도록 수정
-    model.classifier[4] = nn.Conv2d(512, len(CLASSES), kernel_size=1)
+    # encoder_name = "resnet50"
+    
+    # model = models.segmentation.fcn_resnet50(pretrained=True)
+    # # output class를 data set에 맞도록 수정
+    # model.classifier[4] = nn.Conv2d(512, len(CLASSES), kernel_size=1)
+    model = smp.FPN(
+    encoder_name="resnet50", # choose encoder, e.g. mobilenet_v2 or efficientnet-b7
+    encoder_weights="imagenet",     # use `imagenet` pre-trained weights for encoder initialization
+    in_channels=3,                  # model input channels (1 for gray-scale images, 3 for RGB, etc.)
+    classes=29,                     # model output channels (number of classes in your dataset)
+    activation="identity"
+)
+
     # Loss function 정의
     criterion = nn.BCEWithLogitsLoss()
     
@@ -324,6 +336,23 @@ def main():
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--seed", type=int, default=42, help="random seed (default: 42)")
+    parser.add_argument("--model", type=str, default="temp")
+    parser.add_argument("--epochs", type=int, default=100)
+    parser.add_argument("--val_every", type=int, default=1)
+    
+
+
+
+
+
+
+
+
+
+
+
     main()
 
 
