@@ -4,6 +4,7 @@ import random
 import datetime
 from functools import partial
 import argparse
+from importlib import import_module
 
 # external library
 import cv2
@@ -21,7 +22,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 from torchvision import models
-
+import model
 
 # visualization
 import matplotlib.pyplot as plt
@@ -53,7 +54,7 @@ LR = 1e-4
 RANDOM_SEED = 21
 
 NUM_EPOCHS = 100    # CHANGE
-VAL_EVERY = 5       #Caution!
+# VAL_EVERY = 5       #Caution!
 
 SAVED_DIR = "/opt/ml/input/code/results_baseline/"
 
@@ -197,27 +198,28 @@ def dice_coef(y_true, y_pred):
     eps = 0.0001
     return (2. * intersection + eps) / (torch.sum(y_true_f, -1) + torch.sum(y_pred_f, -1) + eps)
 
-def save_model(model, file_name='fcn_resnet50_best_model.pt'):
-    output_path = os.path.join(SAVED_DIR, file_name)
+def save_model(model, args):
+    output_path = os.path.join(SAVED_DIR, f"{args.model}_{args.epochs}.pt")    #아래의 wandb쪽의 name과 동시 수정할것
     torch.save(model, output_path)
 
-def set_seed():
-    torch.manual_seed(RANDOM_SEED)
-    torch.cuda.manual_seed(RANDOM_SEED)
-    torch.cuda.manual_seed_all(RANDOM_SEED) # if use multi-GPU
+def set_seed(seed):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed) # if use multi-GPU
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
-    np.random.seed(RANDOM_SEED)
-    random.seed(RANDOM_SEED)
+    np.random.seed(seed)
+    random.seed(seed)
 
-wandb.init(config={'batch_size':BATCH_SIZE,
-                   'learning_rate':LR,
-                   'seed':RANDOM_SEED,
-                   'max_epoch':NUM_EPOCHS},
-           project='Segmentation',
-           entity='aivengers_seg',
-           name=f'smp_resnet_baseline_epoch={NUM_EPOCHS}'
-          )
+def wandb_config(args):
+    wandb.init(config={'batch_size':BATCH_SIZE,
+                    'learning_rate':LR,                 #차차 args.~~로 update할 것
+                    'seed':args.seed,
+                    'max_epoch':args.epochs},
+            project='Segmentation',
+            entity='aivengers_seg',
+            name=f'{args.model}_{args.epochs}'
+            )
 
 def validation(epoch, model, data_loader, criterion, thr=0.5):
     print(f'Start validation #{epoch:2d}')
@@ -265,7 +267,13 @@ def validation(epoch, model, data_loader, criterion, thr=0.5):
     
     return avg_dice
 
-def train(model, data_loader, val_loader, criterion, optimizer):
+def train(model, data_loader, val_loader, criterion, optimizer, args):
+    if args.wandb=="True":
+        wandb_config(args)
+    else:
+        print("#########################################################")
+        print("wandb not logging....")
+        print("#########################################################")
     print(f'Start training..')
     
     n_class = len(CLASSES)
@@ -297,63 +305,57 @@ def train(model, data_loader, val_loader, criterion, optimizer):
                     f'Loss: {round(loss.item(),4)}'
                 )
             train={'Loss':round(loss.item(),4)}
-            wandb.log(train, step = epoch)
+            if args.wandb=="True":
+                wandb.log(train, step = epoch)
              
         # validation 주기에 따른 loss 출력 및 best model 저장
-        if (epoch + 1) % VAL_EVERY == 0:
+        if (epoch + 1) % args.val_every == 0:
             dice = validation(epoch + 1, model, val_loader, criterion)
             val={'avg_dice':dice}
-            wandb.log(val, step = epoch)
+            if args.wandb=="True":
+                wandb.log(val, step = epoch)
             
             if best_dice < dice:
                 print(f"Best performance at epoch: {epoch + 1}, {best_dice:.4f} -> {dice:.4f}")
                 print(f"Save model in {SAVED_DIR}")
                 best_dice = dice
-                save_model(model)
+                save_model(model, args)
 
 
-def main():
+def main(args):
     # encoder_name = "resnet50"
     
     # model = models.segmentation.fcn_resnet50(pretrained=True)
     # # output class를 data set에 맞도록 수정
     # model.classifier[4] = nn.Conv2d(512, len(CLASSES), kernel_size=1)
-    model = smp.FPN(
-    encoder_name="resnet50", # choose encoder, e.g. mobilenet_v2 or efficientnet-b7
-    encoder_weights="imagenet",     # use `imagenet` pre-trained weights for encoder initialization
-    in_channels=3,                  # model input channels (1 for gray-scale images, 3 for RGB, etc.)
-    classes=29,                     # model output channels (number of classes in your dataset)
-    activation="identity"
-)
+#     model = smp.FPN(
+#     encoder_name="resnet50", # choose encoder, e.g. mobilenet_v2 or efficientnet-b7
+#     encoder_weights="imagenet",     # use `imagenet` pre-trained weights for encoder initialization
+#     in_channels=3,                  # model input channels (1 for gray-scale images, 3 for RGB, etc.)
+#     classes=29,                     # model output channels (number of classes in your dataset)
+#     activation="identity"
+# )
 
     # Loss function 정의
     criterion = nn.BCEWithLogitsLoss()
-    
+    # model = FCN()
+    model = getattr(import_module("model"), args.model)()
     # Optimizer 정의
     optimizer = optim.Adam(params=model.parameters(), lr=LR, weight_decay=1e-6)
-    set_seed()
-    train(model, train_loader, valid_loader, criterion, optimizer)
+    set_seed(args.seed)
+    train(model, train_loader, valid_loader, criterion, optimizer, args)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--seed", type=int, default=42, help="random seed (default: 42)")
-    parser.add_argument("--model", type=str, default="temp")
+    parser.add_argument("--seed", type=int, default=21, help="random seed (default: 21)")
+    parser.add_argument("--model", type=str, default="FCN")
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--val_every", type=int, default=1)
-    
+    parser.add_argument("--wandb", type=str, default="True")
 
 
+    args = parser.parse_args()
+    print(args)
 
-
-
-
-
-
-
-
-
-    main()
-
-
-
+    main(args)
