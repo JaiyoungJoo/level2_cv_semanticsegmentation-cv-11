@@ -13,6 +13,22 @@ from torch.utils.data import Dataset, DataLoader
 
 import argparse
 
+# csv 저장명 중복 확인
+def exist_csv(filename):
+    # 파일이름에 .csv 확장자 추가
+    filename = filename + ".csv"
+
+    # 중복 확인을 위해 카운터 초기화
+    counter = 1
+
+    # 파일이름이 이미 존재하는지 확인
+    while os.path.exists(filename):
+        # 중복되는 경우 파일이름에 숫자 추가
+        filename = f"{filename[:-4]}_{counter}.csv"
+        counter += 1
+
+    return filename
+
 def encode_mask_to_rle(mask):
     '''
     mask: numpy array binary mask 
@@ -123,7 +139,9 @@ def main():
         "rle": rles,
     })
 
-    df.to_csv(f"{SAVED_DIR}/{MODEL_NAME}.csv", index=False)
+    save_path = f"{SAVED_DIR}/{MODEL_NAME}"
+    csv_name = exist_csv(save_path)
+    df.to_csv(csv_name, index=False)
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -158,7 +176,8 @@ if __name__ == '__main__':
 
     IND2CLASS = {v: k for k, v in CLASS2IND.items()}
     
-    MODEL_NAME = MODEL_ROOT.split('/')[-1].split('.')[0]
+    MODEL_NAME = MODEL_ROOT.split('/')[-1].split('.')[0] # 절대 경로 제거
+    MODEL_NAME = MODEL_NAME.replace('_best_model', '')
     
     pngs = {
         os.path.relpath(os.path.join(root, fname), start=IMAGE_ROOT)
