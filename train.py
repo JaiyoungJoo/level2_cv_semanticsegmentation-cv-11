@@ -72,7 +72,7 @@ def dice_coef(y_true, y_pred):
     eps = 0.0001
     return (2. * intersection + eps) / (torch.sum(y_true_f, -1) + torch.sum(y_pred_f, -1) + eps)
 
-def save_model(model, args, epoch):
+def save_model(model, args):
     
     output_path = os.path.join(args.save_dir, f"{args.model}_{args.epochs}.pt")    #아래의 wandb쪽의 name과 동시 수정할것
     torch.save(model, output_path)
