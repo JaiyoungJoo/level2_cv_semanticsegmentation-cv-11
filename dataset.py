@@ -9,8 +9,8 @@ import torch
 
 
 # 데이터 경로를 입력하세요
-IMAGE_ROOT = "/opt/ml/data/train/DCM"
-LABEL_ROOT = "/opt/ml/data/train/outputs_json"
+IMAGE_ROOT = "/opt/ml/input/data/train/DCM/"
+LABEL_ROOT = "/opt/ml/input/data/train/outputs_json/"
 
 CLASSES = [
     'finger-1', 'finger-2', 'finger-3', 'finger-4', 'finger-5',
@@ -202,24 +202,3 @@ class XRayDataset(Dataset):
         label = torch.from_numpy(label).float()
             
         return image, label
-
-# tf = A.Resize(512, 512)
-# train_dataset = XRayDataset(is_train=True, transforms=A.Resize(512, 512))
-#valid_dataset = XRayDataset(is_train=False, transforms=A.Resize(512, 512))
-'''
-train_loader = DataLoader(
-    dataset=train_dataset, 
-    batch_size=BATCH_SIZE,
-    shuffle=True,
-    num_workers=8,
-    drop_last=True,
-)
-
-valid_loader = DataLoader(
-    dataset=valid_dataset, 
-    batch_size=2,
-    shuffle=False,
-    num_workers=2,
-    drop_last=False
-)
-'''
