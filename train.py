@@ -1,31 +1,22 @@
 import os
-import json
 import random
 import datetime
-from functools import partial
 import argparse
 from importlib import import_module
 
 # external library
-import cv2
 import numpy as np
-import pandas as pd
 from tqdm.auto import tqdm
-from sklearn.model_selection import GroupKFold
 import albumentations as A
-import segmentation_models_pytorch as smp
 
 # torch
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torch.utils.data import Dataset, DataLoader
-from torchvision import models
-import model
+from torch.utils.data import DataLoader
 
 # visualization
-import matplotlib.pyplot as plt
 import wandb
 
 # dataset
@@ -35,9 +26,6 @@ from dataset import XRayDataset
 # exp setting
 BATCH_SIZE = 8
 LR = 1e-4
-RANDOM_SEED = 21
-NUM_EPOCHS = 100    # CHANGE
-# VAL_EVERY = 5       #Caution!
 CLASSES = [
     'finger-1', 'finger-2', 'finger-3', 'finger-4', 'finger-5',
     'finger-6', 'finger-7', 'finger-8', 'finger-9', 'finger-10',
@@ -164,7 +152,7 @@ def train(model, data_loader, val_loader, criterion, optimizer, args):
     n_class = len(CLASSES)
     best_dice = 0.
     
-    for epoch in range(NUM_EPOCHS):
+    for epoch in range(args.epochs):
         model.train()
 
         for step, (images, masks) in enumerate(data_loader):            
@@ -185,7 +173,7 @@ def train(model, data_loader, val_loader, criterion, optimizer, args):
             if (step + 1) % 25 == 0:
                 print(
                     f'{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")} | '
-                    f'Epoch [{epoch+1}/{NUM_EPOCHS}], '
+                    f'Epoch [{epoch+1}/{args.epochs}], '
                     f'Step [{step+1}/{len(train_loader)}], '
                     f'Loss: {round(loss.item(),4)}'
                 )
@@ -224,7 +212,7 @@ def main(args):
     # Loss function 정의
     criterion = nn.BCEWithLogitsLoss()
     # model = FCN()
-    model = getattr(import_module("model"), args.model)()
+    model = getattr(import_module("model"), args.model)(encoder = args.encoder)
     # Optimizer 정의
     optimizer = optim.Adam(params=model.parameters(), lr=LR, weight_decay=1e-6)
     set_seed(args.seed)
@@ -238,7 +226,7 @@ if __name__ == '__main__':
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--val_every", type=int, default=1)
     parser.add_argument("--wandb", type=str, default="True")
-
+    parser.add_argument("--encoder", type=str, default="resnet101")
 
     args = parser.parse_args()
     print(args)
