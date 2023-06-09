@@ -46,5 +46,5 @@ class FPN(nn.Module):
         )
 
     def forward(self, x):
-        out = self.net(x)['out']
+        out = self.net(x)
         return out
