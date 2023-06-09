@@ -2,6 +2,7 @@
 import torch.nn as nn
 from torchvision.models import segmentation
 import segmentation_models_pytorch as smp
+import torch
 
 
 
@@ -44,6 +45,26 @@ class FPN(nn.Module):
             classes=num_classes,                     # model output channels (number of classes in your dataset)
             activation="identity"
         )
+
+    def forward(self, x):
+        out = self.net(x)
+        return out
+    
+# pretrained weight
+
+class Pretrained_torchvision(nn.Module):
+    def __init__(self,  model = "/opt/ml/weights/fcn_resnet101_best_model.pt"):
+        super().__init__()
+        self.net = torch.load(model)
+
+    def forward(self, x):
+        out = self.net(x)['out']
+        return out
+    
+class Pretrained_smp(nn.Module):
+    def __init__(self,  model = "/opt/ml/weights/fpn_resnet101_best_model.pt"):
+        super().__init__()
+        self.net = torch.load(model)
 
     def forward(self, x):
         out = self.net(x)

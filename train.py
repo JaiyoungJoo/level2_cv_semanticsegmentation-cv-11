@@ -153,8 +153,13 @@ def train(model, data_loader, val_loader, criterion, optimizer, args):
     
     n_class = len(CLASSES)
     best_dice = 0.
-    
+    seed = 0
     for epoch in range(args.epochs):
+        if epoch % 3 == 0:
+            seed += 1
+            set_seed(seed)
+
+
         model.train()
 
         for step, (images, masks) in enumerate(data_loader):            
@@ -199,10 +204,20 @@ def train(model, data_loader, val_loader, criterion, optimizer, args):
 
 def main(args):
     criterion = nn.BCEWithLogitsLoss()
-    model = getattr(import_module("model"), args.model)(encoder = args.encoder)
+    if args.model == 'Pretrained_torchvision':
+        model = getattr(import_module("model"), args.model)(model = args.model_path)
+    elif args.model == 'Pretrained_smp':
+        model = getattr(import_module("model"), args.model)(model = args.model_path)
+    else : 
+        model = getattr(import_module("model"), args.model)(encoder = args.encoder)
+
     optimizer = optim.Adam(params=model.parameters(), lr=LR, weight_decay=1e-6)
 
-    set_seed(args.seed)
+    if args.seed != 'up':
+        set_seed(args.seed)
+    else:
+        set_seed(0)
+
     check_path(args.save_dir)
     train_loader, valid_loader = make_dataset()
     print(train_loader)
@@ -211,16 +226,20 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--seed", type=int, default=21, help="random seed (default: 21)")
+    parser.add_argument("--seed", default=21, help="random seed (default: 21)")
     parser.add_argument("--model", type=str, default="FCN")
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--val_every", type=int, default=1)
     parser.add_argument("--wandb", type=str, default="True")
     parser.add_argument("--encoder", type=str, default="resnet101")
     parser.add_argument("--save_dir", type=str, default="/opt/ml/weights/")
+    parser.add_argument("--model_path", type=str, default="/opt/ml/weights/fcn_resnet101_best_model.pt")
 
     args = parser.parse_args()
-    args.save_dir = os.path.join(args.save_dir, args.model)
+    if args.model == 'Pretrained_torchvision' or 'Pretrained_smp':
+        args.save_dir = os.path.join(args.save_dir, args.model_path.split('/')[-1].split('.')[0])
+    else:
+        args.save_dir = os.path.join(args.save_dir, args.model)
 
     print(args)
     main(args)
