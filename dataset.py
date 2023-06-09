@@ -8,13 +8,112 @@ import json
 import torch
 
 
+# 데이터 경로를 입력하세요
+IMAGE_ROOT = "/opt/ml/data/train/DCM"
+LABEL_ROOT = "/opt/ml/data/train/outputs_json"
+
+CLASSES = [
+    'finger-1', 'finger-2', 'finger-3', 'finger-4', 'finger-5',
+    'finger-6', 'finger-7', 'finger-8', 'finger-9', 'finger-10',
+    'finger-11', 'finger-12', 'finger-13', 'finger-14', 'finger-15',
+    'finger-16', 'finger-17', 'finger-18', 'finger-19', 'Trapezium',
+    'Trapezoid', 'Capitate', 'Hamate', 'Scaphoid', 'Lunate',
+    'Triquetrum', 'Pisiform', 'Radius', 'Ulna',
+]
+
+CLASS2IND = {v: i for i, v in enumerate(CLASSES)}
+IND2CLASS = {v: k for k, v in CLASS2IND.items()}
+
+def check_size_of_dataset(IMAGE_ROOT, LABEL_ROOT):
+    pngs = {
+        os.path.relpath(os.path.join(root, fname), start=IMAGE_ROOT) # relpath : 상대 경로로 변경
+        for root, _dirs, files in os.walk(IMAGE_ROOT)
+        for fname in files
+        if os.path.splitext(fname)[1].lower() == ".png"
+        }
+
+    jsons = {
+        os.path.relpath(os.path.join(root, fname), start=LABEL_ROOT)
+        for root, _dirs, files in os.walk(LABEL_ROOT)
+        for fname in files
+        if os.path.splitext(fname)[1].lower() == ".json"
+        }
+
+    jsons_fn_prefix = {os.path.splitext(fname)[0] for fname in jsons}
+    pngs_fn_prefix = {os.path.splitext(fname)[0] for fname in pngs}
+
+    assert len(jsons_fn_prefix - pngs_fn_prefix) == 0
+    assert len(pngs_fn_prefix - jsons_fn_prefix) == 0
+
+    pngs = sorted(pngs)
+    jsons = sorted(jsons)
+
+    return pngs, jsons
+
+# PALETTE = [
+#     (220, 20, 60), (119, 11, 32), (0, 0, 142), (0, 0, 230), (106, 0, 228),
+#     (0, 60, 100), (0, 80, 100), (0, 0, 70), (0, 0, 192), (250, 170, 30),
+#     (100, 170, 30), (220, 220, 0), (175, 116, 175), (250, 0, 30), (165, 42, 42),
+#     (255, 77, 255), (0, 226, 252), (182, 182, 255), (0, 82, 0), (120, 166, 157),
+#     (110, 76, 0), (174, 57, 255), (199, 100, 0), (72, 0, 118), (255, 179, 240),
+#     (0, 125, 92), (209, 0, 151), (188, 208, 182), (0, 220, 176),
+#     ]
+
+
+# def label2rgb(label):
+#     '''
+#     data sample 추출 하는 함수
+#     <사용 예시>
+#     fig, ax = plt.subplots(1, 2, figsize=(24, 12))
+#     ax[0].imshow(image[0])    # remove channel dimension
+#     ax[1].imshow(label2rgb(label))
+
+#     plt.show()
+#     '''
+#     image_size = label.shape[1:] + (3, )
+#     image = np.zeros(image_size, dtype=np.uint8)
+    
+#     for i, class_label in enumerate(label):
+#         image[class_label == 1] = PALETTE[i]
+        
+#     return image
+
+class XRayInferenceDataset(Dataset):
+    def __init__(self, transforms=None):
+        pngs, jsons = check_size_of_dataset(IMAGE_ROOT, LABEL_ROOT)
+        
+        _filenames = pngs
+        _filenames = np.array(sorted(_filenames))
+        
+        self.filenames = _filenames
+        self.transforms = transforms
+    
+    def __len__(self):
+        return len(self.filenames)
+    
+    def __getitem__(self, item):
+        image_name = self.filenames[item]
+        image_path = os.path.join(IMAGE_ROOT, image_name)
+        
+        image = cv2.imread(image_path)
+        image = image / 255.
+        
+        if self.transforms is not None:
+            inputs = {"image": image}
+            result = self.transforms(**inputs)
+            image = result["image"]
+
+        # to tenser will be done later
+        image = image.transpose(2, 0, 1)    # make channel first
+        
+        image = torch.from_numpy(image).float()
+            
+        return image, image_name
 
 class XRayDataset(Dataset):
     def __init__(self, is_train=True, transforms=None):
+        pngs, jsons = check_size_of_dataset(IMAGE_ROOT, LABEL_ROOT)
 
-        pngs = sorted(pngs)
-        jsons = sorted(jsons)
-        
         _filenames = np.array(pngs)
         _labelnames = np.array(jsons)
         
@@ -103,3 +202,24 @@ class XRayDataset(Dataset):
         label = torch.from_numpy(label).float()
             
         return image, label
+
+# tf = A.Resize(512, 512)
+# train_dataset = XRayDataset(is_train=True, transforms=A.Resize(512, 512))
+#valid_dataset = XRayDataset(is_train=False, transforms=A.Resize(512, 512))
+'''
+train_loader = DataLoader(
+    dataset=train_dataset, 
+    batch_size=BATCH_SIZE,
+    shuffle=True,
+    num_workers=8,
+    drop_last=True,
+)
+
+valid_loader = DataLoader(
+    dataset=valid_dataset, 
+    batch_size=2,
+    shuffle=False,
+    num_workers=2,
+    drop_last=False
+)
+'''
