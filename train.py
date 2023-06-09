@@ -35,11 +35,11 @@ CLASSES = [
     'Triquetrum', 'Pisiform', 'Radius', 'Ulna',
 ]
 
-
-# 가중치 저장 경로 설정
-SAVED_DIR = "/opt/ml/input/code/results_baseline/"
-if not os.path.isdir(SAVED_DIR):                                                           
-    os.mkdir(SAVED_DIR)
+def check_path(path):
+    # 가중치 저장 경로 설정
+    # SAVED_DIR = "/opt/ml/input/code/results_baseline/"
+    if not os.path.isdir(path):                                                           
+        os.mkdir(path)
 
 
 # dataset load
@@ -71,8 +71,8 @@ def dice_coef(y_true, y_pred):
     eps = 0.0001
     return (2. * intersection + eps) / (torch.sum(y_true_f, -1) + torch.sum(y_pred_f, -1) + eps)
 
-def save_model(model, args):
-    output_path = os.path.join(SAVED_DIR, f"{args.model}_{args.epochs}.pt")    #아래의 wandb쪽의 name과 동시 수정할것
+def save_model(model, args, epoch):
+    output_path = os.path.join(args.save_dir, f"{args.model}_{args.epochs}_{epoch}.pt")    #아래의 wandb쪽의 name과 동시 수정할것
     torch.save(model, output_path)
 
 def set_seed(seed):
@@ -190,25 +190,12 @@ def train(model, data_loader, val_loader, criterion, optimizer, args):
             
             if best_dice < dice:
                 print(f"Best performance at epoch: {epoch + 1}, {best_dice:.4f} -> {dice:.4f}")
-                print(f"Save model in {SAVED_DIR}")
+                print(f"Save model in {args.save_dir}")
                 best_dice = dice
-                save_model(model, args)
+                save_model(model, args, epoch+1)
 
 
 def main(args):
-    # encoder_name = "resnet50"
-    
-    # model = models.segmentation.fcn_resnet50(pretrained=True)
-    # # output class를 data set에 맞도록 수정
-    # model.classifier[4] = nn.Conv2d(512, len(CLASSES), kernel_size=1)
-#     model = smp.FPN(
-#     encoder_name="resnet50", # choose encoder, e.g. mobilenet_v2 or efficientnet-b7
-#     encoder_weights="imagenet",     # use `imagenet` pre-trained weights for encoder initialization
-#     in_channels=3,                  # model input channels (1 for gray-scale images, 3 for RGB, etc.)
-#     classes=29,                     # model output channels (number of classes in your dataset)
-#     activation="identity"
-# )
-
     # Loss function 정의
     criterion = nn.BCEWithLogitsLoss()
     # model = FCN()
@@ -216,6 +203,7 @@ def main(args):
     # Optimizer 정의
     optimizer = optim.Adam(params=model.parameters(), lr=LR, weight_decay=1e-6)
     set_seed(args.seed)
+    check_path(args.save_dir)
     train(model, train_loader, valid_loader, criterion, optimizer, args)
 
 
@@ -227,6 +215,7 @@ if __name__ == '__main__':
     parser.add_argument("--val_every", type=int, default=1)
     parser.add_argument("--wandb", type=str, default="True")
     parser.add_argument("--encoder", type=str, default="resnet101")
+    parser.add_argument("--save_dir", type=str, default="/opt/ml/weights/")
 
     args = parser.parse_args()
     print(args)
