@@ -41,27 +41,29 @@ def check_path(path):
     if not os.path.isdir(path):                                                           
         os.mkdir(path)
 
+def make_dataset():
+    # dataset load
+    tf = A.Resize(512, 512)
+    train_dataset = XRayDataset(is_train=True, transforms=tf)
+    valid_dataset = XRayDataset(is_train=False, transforms=tf)
 
-# dataset load
-tf = A.Resize(512, 512)
-train_dataset = XRayDataset(is_train=True, transforms=tf)
-valid_dataset = XRayDataset(is_train=False, transforms=tf)
+    train_loader = DataLoader(
+        dataset=train_dataset, 
+        batch_size=BATCH_SIZE,
+        shuffle=True,
+        num_workers=8,
+        drop_last=True,
+    )
 
-train_loader = DataLoader(
-    dataset=train_dataset, 
-    batch_size=BATCH_SIZE,
-    shuffle=True,
-    num_workers=8,
-    drop_last=True,
-)
+    valid_loader = DataLoader(
+        dataset=valid_dataset, 
+        batch_size=2,
+        shuffle=False,
+        num_workers=0,
+        drop_last=False
+    )
 
-valid_loader = DataLoader(
-    dataset=valid_dataset, 
-    batch_size=2,
-    shuffle=False,
-    num_workers=0,
-    drop_last=False
-)
+    return [train_loader, valid_loader]
 
 def dice_coef(y_true, y_pred):
     y_true_f = y_true.flatten(2)
@@ -174,7 +176,7 @@ def train(model, data_loader, val_loader, criterion, optimizer, args):
                 print(
                     f'{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")} | '
                     f'Epoch [{epoch+1}/{args.epochs}], '
-                    f'Step [{step+1}/{len(train_loader)}], '
+                    f'Step [{step+1}/{len(data_loader)}], '
                     f'Loss: {round(loss.item(),4)}'
                 )
             train={'Loss':round(loss.item(),4)}
@@ -204,6 +206,8 @@ def main(args):
     optimizer = optim.Adam(params=model.parameters(), lr=LR, weight_decay=1e-6)
     set_seed(args.seed)
     check_path(args.save_dir)
+    train_loader, valid_loader = make_dataset()
+    print(train_loader)
     train(model, train_loader, valid_loader, criterion, optimizer, args)
 
 
