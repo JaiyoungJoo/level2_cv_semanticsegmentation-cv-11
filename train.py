@@ -14,7 +14,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 
 # visualization
 import wandb
@@ -40,12 +40,25 @@ def check_path(path):
     if not os.path.isdir(path):                                                           
         os.mkdir(path)
 
-def make_dataset():
+def make_dataset(debug="False"):
     # dataset load
     tf = A.Resize(512, 512)
     train_dataset = XRayDataset(is_train=True, transforms=tf)
     valid_dataset = XRayDataset(is_train=False, transforms=tf)
+    if debug=="True":
+        train_subset_size = int(len(train_dataset) * 0.1)
 
+        # Create a random train subset of the original dataset
+        train_subset_indices = torch.randperm(len(train_dataset))[:train_subset_size]
+        train_dataset = Subset(train_dataset, train_subset_indices)
+
+        # Calculate the number of samples for the valid subset
+        valid_subset_size = int(len(valid_dataset) * 0.1)
+
+        # Create a random valid subset of the original dataset
+        valid_subset_indices = torch.randperm(len(valid_dataset))[:valid_subset_size]
+        valid_dataset = Subset(valid_dataset, valid_subset_indices)
+        
     train_loader = DataLoader(
         dataset=train_dataset, 
         batch_size=BATCH_SIZE,
@@ -74,7 +87,7 @@ def dice_coef(y_true, y_pred):
 
 def save_model(model, args):
     
-    output_path = os.path.join(args.save_dir, f"{args.model}_{args.epochs}.pt")    #아래의 wandb쪽의 name과 동시 수정할것
+    output_path = os.path.join(args.save_dir, f"{args.model}_{args.encoder}_{args.epochs}.pt")    #아래의 wandb쪽의 name과 동시 수정할것
     torch.save(model, output_path)
 
 def set_seed(seed):
@@ -93,7 +106,7 @@ def wandb_config(args):
                     'max_epoch':args.epochs},
             project='Segmentation',
             entity='aivengers_seg',
-            name=f'{args.model}_{args.epochs}'
+            name=f'{args.model}_{args.encoder}_{args.epochs}'
             )
 
 def validation(epoch, model, data_loader, criterion, thr=0.5):
@@ -155,9 +168,10 @@ def train(model, data_loader, val_loader, criterion, optimizer, args):
     best_dice = 0.
     seed = 0
     for epoch in range(args.epochs):
-        if epoch % 3 == 0:
+        if args.seed == 'up'and epoch % 5 == 0:
             seed += 1
             set_seed(seed)
+            data_loader, valid_loader = make_dataset()
 
 
         model.train()
@@ -203,7 +217,8 @@ def train(model, data_loader, val_loader, criterion, optimizer, args):
 
 
 def main(args):
-    criterion = nn.BCEWithLogitsLoss()
+    # criterion = nn.BCEWithLogitsLoss()
+    criterion = getattr(import_module("loss"), args.loss)
     if args.model == 'Pretrained_torchvision':
         model = getattr(import_module("model"), args.model)(model = args.model_path)
     elif args.model == 'Pretrained_smp':
@@ -215,18 +230,19 @@ def main(args):
 
     if args.seed != 'up':
         set_seed(args.seed)
+        train_loader, valid_loader = make_dataset(args.debug)
     else:
         set_seed(0)
+        train_loader, valid_loader = make_dataset()
 
     check_path(args.save_dir)
-    train_loader, valid_loader = make_dataset()
-    print(train_loader)
     train(model, train_loader, valid_loader, criterion, optimizer, args)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", default=21, help="random seed (default: 21)")
+    parser.add_argument("--loss", type=str, default="bce_loss")
     parser.add_argument("--model", type=str, default="FCN")
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--val_every", type=int, default=1)
@@ -234,6 +250,8 @@ if __name__ == '__main__':
     parser.add_argument("--encoder", type=str, default="resnet101")
     parser.add_argument("--save_dir", type=str, default="/opt/ml/weights/")
     parser.add_argument("--model_path", type=str, default="/opt/ml/weights/fcn_resnet101_best_model.pt")
+    parser.add_argument("--debug", type=str, default="False")
+
 
     args = parser.parse_args()
     if args.model == 'Pretrained_torchvision' or 'Pretrained_smp':
