@@ -204,7 +204,8 @@ def train(model, data_loader, val_loader, criterion, optimizer, args):
 
 
 def main(args):
-    criterion = nn.BCEWithLogitsLoss()
+    # criterion = nn.BCEWithLogitsLoss()
+    criterion = getattr(import_module("loss"), args.loss)
     if args.model == 'Pretrained_torchvision':
         model = getattr(import_module("model"), args.model)(model = args.model_path)
     elif args.model == 'Pretrained_smp':
@@ -229,6 +230,7 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", default=21, help="random seed (default: 21)")
+    parser.add_argument("--loss", type=str, default="bce_loss")
     parser.add_argument("--model", type=str, default="FCN")
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--val_every", type=int, default=1)
