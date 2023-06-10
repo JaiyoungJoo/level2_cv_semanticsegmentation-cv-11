@@ -155,9 +155,10 @@ def train(model, data_loader, val_loader, criterion, optimizer, args):
     best_dice = 0.
     seed = 0
     for epoch in range(args.epochs):
-        if epoch % 3 == 0:
+        if args.seed == 'up'and epoch % 5 == 0:
             seed += 1
             set_seed(seed)
+            data_loader, valid_loader = make_dataset()
 
 
         model.train()
@@ -215,11 +216,12 @@ def main(args):
 
     if args.seed != 'up':
         set_seed(args.seed)
+        train_loader, valid_loader = make_dataset()
     else:
         set_seed(0)
+        train_loader, valid_loader = make_dataset()
 
     check_path(args.save_dir)
-    train_loader, valid_loader = make_dataset()
     print(train_loader)
     train(model, train_loader, valid_loader, criterion, optimizer, args)
 
