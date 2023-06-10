@@ -74,7 +74,7 @@ def dice_coef(y_true, y_pred):
 
 def save_model(model, args):
     
-    output_path = os.path.join(args.save_dir, f"{args.model}_{args.epochs}.pt")    #아래의 wandb쪽의 name과 동시 수정할것
+    output_path = os.path.join(args.save_dir, f"{args.model}_{args.encoder}_{args.epochs}.pt")    #아래의 wandb쪽의 name과 동시 수정할것
     torch.save(model, output_path)
 
 def set_seed(seed):
@@ -93,7 +93,7 @@ def wandb_config(args):
                     'max_epoch':args.epochs},
             project='Segmentation',
             entity='aivengers_seg',
-            name=f'{args.model}_{args.epochs}'
+            name=f'{args.model}_{args.encoder}_{args.epochs}'
             )
 
 def validation(epoch, model, data_loader, criterion, thr=0.5):
