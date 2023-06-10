@@ -14,7 +14,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 
 # visualization
 import wandb
@@ -40,12 +40,25 @@ def check_path(path):
     if not os.path.isdir(path):                                                           
         os.mkdir(path)
 
-def make_dataset():
+def make_dataset(debug="False"):
     # dataset load
     tf = A.Resize(512, 512)
     train_dataset = XRayDataset(is_train=True, transforms=tf)
     valid_dataset = XRayDataset(is_train=False, transforms=tf)
+    if debug=="True":
+        train_subset_size = int(len(train_dataset) * 0.1)
 
+        # Create a random train subset of the original dataset
+        train_subset_indices = torch.randperm(len(train_dataset))[:train_subset_size]
+        train_dataset = Subset(train_dataset, train_subset_indices)
+
+        # Calculate the number of samples for the valid subset
+        valid_subset_size = int(len(valid_dataset) * 0.1)
+
+        # Create a random valid subset of the original dataset
+        valid_subset_indices = torch.randperm(len(valid_dataset))[:valid_subset_size]
+        valid_dataset = Subset(valid_dataset, valid_subset_indices)
+        
     train_loader = DataLoader(
         dataset=train_dataset, 
         batch_size=BATCH_SIZE,
@@ -217,13 +230,12 @@ def main(args):
 
     if args.seed != 'up':
         set_seed(args.seed)
-        train_loader, valid_loader = make_dataset()
+        train_loader, valid_loader = make_dataset(args.debug)
     else:
         set_seed(0)
         train_loader, valid_loader = make_dataset()
 
     check_path(args.save_dir)
-    print(train_loader)
     train(model, train_loader, valid_loader, criterion, optimizer, args)
 
 
@@ -238,6 +250,8 @@ if __name__ == '__main__':
     parser.add_argument("--encoder", type=str, default="resnet101")
     parser.add_argument("--save_dir", type=str, default="/opt/ml/weights/")
     parser.add_argument("--model_path", type=str, default="/opt/ml/weights/fcn_resnet101_best_model.pt")
+    parser.add_argument("--debug", type=str, default="False")
+
 
     args = parser.parse_args()
     if args.model == 'Pretrained_torchvision' or 'Pretrained_smp':
