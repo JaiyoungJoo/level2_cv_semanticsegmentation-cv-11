@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from segmentation_models_pytorch import losses
 
 def bce_loss(pred, target):
     loss_function = nn.BCEWithLogitsLoss()
@@ -29,4 +30,9 @@ def calc_loss(pred, target, bce_weight = 0.5):
     pred = F.sigmoid(pred)
     dice = dice_loss(pred, target)
     loss = bce * bce_weight + dice * (1 - bce_weight)
+    return loss
+
+def smp_dice_loss(pred, target):
+    loss_function = getattr(losses, "DiceLoss")(mode="multilabel")
+    loss = loss_function(pred, target)
     return loss
