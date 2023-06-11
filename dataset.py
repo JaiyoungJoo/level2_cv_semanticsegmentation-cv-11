@@ -136,7 +136,6 @@ class XRayDataset(Dataset):
     def __getitem__(self, item):
         image_name = self.filenames[item]
         image_path = os.path.join(IMAGE_ROOT, image_name)
-        print(image_path.split('/')[-2])
         
         
         image = cv2.imread(image_path)
@@ -232,9 +231,7 @@ class XRayDataset_Multi(Dataset):
     def __getitem__(self, item):
         image_name = self.filenames[item]
         image_path = os.path.join(IMAGE_ROOT, image_name)
-        print(image_path)
         id_num = int(image_path.split('/')[-2][-3:])
-        print(id_num)
         
         image = cv2.imread(image_path)
         image = image / 255.
@@ -272,13 +269,18 @@ class XRayDataset_Multi(Dataset):
         # to tenser will be done later
         image = image.transpose(2, 0, 1)    # make channel first
         label = label.transpose(2, 0, 1)
-        
+
         image = torch.from_numpy(image).float()
+
         label = torch.from_numpy(label).float()
+
         info = self.meta[self.meta['ID'] == id_num]
         age = torch.tensor(int(info['나이'].iloc[0])).float()
+
         gender = torch.tensor(0).float() if str(info['성별'].iloc[0]).split('_')[-1] == '남' else torch.tensor(1).float()
+
         weight = torch.tensor(int(info['체중(몸무게)'].iloc[0])).float()
+
         hight = torch.tensor(int(info['키(신장)'].iloc[0])).float()
             
         return image, label, age, gender, weight, hight
