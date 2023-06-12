@@ -36,3 +36,8 @@ def smp_dice_loss(pred, target):
     loss_function = getattr(losses, "DiceLoss")(mode="multilabel")
     loss = loss_function(pred, target)
     return loss
+
+def smp_focal_loss(pred, target):
+    loss_function = getattr(losses, "FocalLoss")(mode="multilabel")
+    loss = loss_function(pred, target)
+    return loss

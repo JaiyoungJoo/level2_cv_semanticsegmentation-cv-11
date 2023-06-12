@@ -34,7 +34,8 @@ CLASSES = [
     'Trapezoid', 'Capitate', 'Hamate', 'Scaphoid', 'Lunate',
     'Triquetrum', 'Pisiform', 'Radius', 'Ulna',
 ]
-
+my_table = wandb.Table(
+    columns=["epoch"] + CLASSES)
 def check_path(path):
     # 가중치 저장 경로 설정
     if not os.path.isdir(path):                                                           
@@ -87,7 +88,7 @@ def dice_coef(y_true, y_pred):
 
 def save_model(model, args):
     
-    output_path = os.path.join(args.save_dir, f"{args.model}_{args.encoder}_{args.epochs}.pt")    #아래의 wandb쪽의 name과 동시 수정할것
+    output_path = os.path.join(args.save_dir, f"{args.model}_{args.encoder}_{args.loss}_{args.epochs}.pt")    #아래의 wandb쪽의 name과 동시 수정할것
     torch.save(model, output_path)
 
 def set_seed(seed):
@@ -106,7 +107,7 @@ def wandb_config(args):
                     'max_epoch':args.epochs},
             project='Segmentation',
             entity='aivengers_seg',
-            name=f'{args.model}_{args.encoder}_{args.epochs}'
+            name=f'{args.model}_{args.encoder}_{args.loss}_{args.epochs}'
             )
 
 def validation(epoch, model, data_loader, criterion, thr=0.5):
@@ -145,6 +146,8 @@ def validation(epoch, model, data_loader, criterion, thr=0.5):
                 
     dices = torch.cat(dices, 0)
     dices_per_class = torch.mean(dices, 0)
+    row = np.concatenate((np.array([epoch]), np.array(dices_per_class)))
+    my_table.add_data(*row)
     dice_str = [
         f"{c:<12}: {d.item():.4f}"
         for c, d in zip(CLASSES, dices_per_class)
@@ -215,6 +218,7 @@ def train(model, data_loader, val_loader, criterion, optimizer, args):
                 best_dice = dice
                 save_model(model, args)
 
+    wandb.log({"Table Name": my_table}, step=epoch)   
 
 def main(args):
     # criterion = nn.BCEWithLogitsLoss()
