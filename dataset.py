@@ -128,7 +128,7 @@ class XRayDataset(Dataset):
         for i, (x, y) in enumerate(gkf.split(_filenames, ys, groups)):
             if is_train:
                 # 0번을 validation dataset으로 사용합니다.
-                if i == seed+(4%5):
+                if i == (seed+4)%5:
                     continue
                     
                 filenames += list(_filenames[y])
