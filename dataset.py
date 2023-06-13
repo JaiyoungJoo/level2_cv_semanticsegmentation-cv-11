@@ -7,6 +7,8 @@ import cv2
 import json
 import torch
 import pandas as pd
+import albumentations as A
+import albumentations.pytorch
 
 # 데이터 경로를 입력하세요
 IMAGE_ROOT = "/opt/ml/input/data/train/DCM/"
@@ -53,6 +55,21 @@ def check_size_of_dataset(IMAGE_ROOT, LABEL_ROOT):
         return pngs, jsons
     else:
         return pngs
+        
+def get_transform():
+    train_transform = [
+        A.RandomContrast(limit=[0,0.5],p=1),
+        # A.CenterCrop(1900,1500),
+        A.Resize(512, 512),
+        # A.pytorch.ToTensorV2()
+
+    ]
+    val_transform = [
+        A.Resize(512, 512),
+        # A.pytorch.ToTensorV2()
+    ]
+
+    return A.Compose(train_transform), A.Compose(val_transform)
 
 class XRayInferenceDataset(Dataset):
     def __init__(self, transforms=None):
