@@ -222,15 +222,12 @@ def train(model, data_loader, val_loader, criterion, optimizer, args):
                 best_dice = dice
                 save_model(model, args)
 
-<<<<<<< HEAD
             val={'avg_dice':dice,
                  'best_dice':best_dice}
             if args.wandb=="True":
                 wandb.log(val, step = epoch)
 
-=======
     wandb.log({"Table Name": my_table}, step=epoch) 
->>>>>>> 1cb57d95a5017453e8d48e905ae31ab46800cf20
 
 def main(args):
     # criterion = nn.BCEWithLogitsLoss()
