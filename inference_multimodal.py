@@ -89,7 +89,7 @@ def main():
 
     tf = A.Resize(512, 512)
 
-    test_dataset = dataset.XRayInferenceDataset(transforms=tf)
+    test_dataset = dataset.XRayInferenceDataset_Multi(transforms=tf)
 
     test_loader = DataLoader(
         dataset=test_dataset, 
@@ -99,7 +99,7 @@ def main():
         drop_last=False
     )
 
-    rles, filename_and_class = test(model, test_loader)
+    rles, filename_and_class  = test(model, test_loader)
 
     classes, filename = zip(*[x.split("_") for x in filename_and_class])
 
