@@ -3,7 +3,7 @@ import random
 import datetime
 import argparse
 from importlib import import_module
-
+import ssl
 # external library
 import numpy as np
 from tqdm.auto import tqdm
@@ -15,13 +15,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader, Subset
-
 # visualization
 import wandb
 
 # dataset
 from dataset import XRayDataset
-
+from dataset import get_transform
+ssl._create_default_https_context = ssl._create_unverified_context
 
 # exp setting
 BATCH_SIZE = 8
@@ -34,6 +34,8 @@ CLASSES = [
     'Trapezoid', 'Capitate', 'Hamate', 'Scaphoid', 'Lunate',
     'Triquetrum', 'Pisiform', 'Radius', 'Ulna',
 ]
+my_table = wandb.Table(
+    columns=["epoch"] + CLASSES)
 
 def check_path(path):
     # 가중치 저장 경로 설정
@@ -43,8 +45,13 @@ def check_path(path):
 def make_dataset(debug="False"):
     # dataset load
     tf = A.Resize(512, 512)
-    train_dataset = XRayDataset(is_train=True, transforms=tf)
-    valid_dataset = XRayDataset(is_train=False, transforms=tf)
+    train_transform, val_transform = get_transform()
+    if args.transform=='True':
+        train_dataset = XRayDataset(is_train=True, transforms=train_transform)
+        valid_dataset = XRayDataset(is_train=False, transforms=val_transform)
+    else:
+        train_dataset = XRayDataset(is_train=True, transforms=tf)
+        valid_dataset = XRayDataset(is_train=False, transforms=tf)
     if debug=="True":
         train_subset_size = int(len(train_dataset) * 0.1)
 
@@ -87,7 +94,7 @@ def dice_coef(y_true, y_pred):
 
 def save_model(model, args):
     
-    output_path = os.path.join(args.save_dir, f"{args.model}_{args.encoder}_{args.epochs}.pt")    #아래의 wandb쪽의 name과 동시 수정할것
+    output_path = os.path.join(args.save_dir, f"{args.model}_{args.encoder}_{args.loss}_{args.epochs}.pt")    #아래의 wandb쪽의 name과 동시 수정할것
     torch.save(model, output_path)
 
 def set_seed(seed):
@@ -106,13 +113,12 @@ def wandb_config(args):
                     'max_epoch':args.epochs},
             project='Segmentation',
             entity='aivengers_seg',
-            name=f'{args.model}_{args.encoder}_{args.epochs}'
+            name=f'{args.model}_{args.encoder}_{args.loss}_{args.epochs}'
             )
 
 def validation(epoch, model, data_loader, criterion, thr=0.5):
     print(f'Start validation #{epoch:2d}')
     model.eval()
-
     dices = []
     with torch.no_grad():
         n_class = len(CLASSES)
@@ -145,6 +151,8 @@ def validation(epoch, model, data_loader, criterion, thr=0.5):
                 
     dices = torch.cat(dices, 0)
     dices_per_class = torch.mean(dices, 0)
+    row = np.concatenate((np.array([epoch]), np.array(dices_per_class)))
+    my_table.add_data(*row)
     dice_str = [
         f"{c:<12}: {d.item():.4f}"
         for c, d in zip(CLASSES, dices_per_class)
@@ -214,11 +222,15 @@ def train(model, data_loader, val_loader, criterion, optimizer, args):
                 best_dice = dice
                 save_model(model, args)
 
+<<<<<<< HEAD
             val={'avg_dice':dice,
                  'best_dice':best_dice}
             if args.wandb=="True":
                 wandb.log(val, step = epoch)
 
+=======
+    wandb.log({"Table Name": my_table}, step=epoch) 
+>>>>>>> 1cb57d95a5017453e8d48e905ae31ab46800cf20
 
 def main(args):
     # criterion = nn.BCEWithLogitsLoss()
@@ -249,12 +261,13 @@ if __name__ == '__main__':
     parser.add_argument("--loss", type=str, default="bce_loss")
     parser.add_argument("--model", type=str, default="FCN")
     parser.add_argument("--epochs", type=int, default=100)
-    parser.add_argument("--val_every", type=int, default=1)
+    parser.add_argument("--val_every", type=int, default=5)
     parser.add_argument("--wandb", type=str, default="True")
     parser.add_argument("--encoder", type=str, default="resnet101")
-    parser.add_argument("--save_dir", type=str, default="/opt/ml/weights/")
-    parser.add_argument("--model_path", type=str, default="/opt/ml/weights/fcn_resnet101_best_model.pt")
+    parser.add_argument("--save_dir", type=str, default="/opt/ml/input/weights/")
+    parser.add_argument("--model_path", type=str, default="/opt/ml/input/weights/albumentation/FPN_densenet161_150.pt")
     parser.add_argument("--debug", type=str, default="False")
+    parser.add_argument("--transform",type=str, default="True")
 
 
     args = parser.parse_args()
