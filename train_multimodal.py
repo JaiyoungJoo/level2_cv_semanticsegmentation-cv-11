@@ -198,34 +198,60 @@ def train(model, data_loader, val_loader, criterion, optimizer, args):
             hights_criterion =  getattr(import_module("loss"), 'mse_loss')(hights_, hights.unsqueeze(1))
 
             loss = segmentation_criterion*0.5 + age_criterion*0.1 + genders_criterion*0.1 + weights_criterion*0.1 + hights_criterion*0.1
+            
+            
+            #print(f'age_pred: {ages_} ')
+            #print(f'age_label: {ages.unsqueeze(1)} ')
+            #print(f'gender_pred: {genders_} ')
+            #print(f'gender_label: {genders.unsqueeze(1)} ')
+            #print(f'weight_pred: {weights_} ')
+            #print(f'weight_label: {weights.unsqueeze(1)} ')
+            #print(f'hight_pred: {hights_} ')
+            #print(f'hight_label: {hights.unsqueeze(1)} ')
+                
+            
+            
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
             
             # step 주기에 따른 loss 출력
-            if (step + 1) % 25 == 0:
+            if (step + 1) % 20 == 0:
                 print(
                     f'{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")} | '
                     f'Epoch [{epoch+1}/{args.epochs}], '
                     f'Step [{step+1}/{len(data_loader)}], '
-                    f'Loss: {round(loss.item(),4)}'
+                    f'Total_Loss:{round(loss.item(),4)}, '
+                    f'seg_Loss: {round(segmentation_criterion.item(),4)} '
+                    f'age_Loss: {round(age_criterion.item(),4)} '
+                    f'gender_Loss: {round(genders_criterion.item(),4)} '
+                    f'weight_Loss: {round(weights_criterion.item(),4)} '
+                    f'hight_Loss: {round(hights_criterion.item(),4)} '
                 )
-            train={'Loss':round(loss.item(),4)}
+            train={'Loss':round(loss.item(),4),
+                   'seg_Loss': round(segmentation_criterion.item(),4),
+                    'age_Loss': round(age_criterion.item(),4),
+                    'gender_Loss': round(genders_criterion.item(),4),
+                    'weight_Loss': round(weights_criterion.item(),4),
+                    'hight_Loss': round(hights_criterion.item(),4)}
+            
             if args.wandb=="True":
                 wandb.log(train, step = epoch)
              
         # validation 주기에 따른 loss 출력 및 best model 저장
         if (epoch + 1) % args.val_every == 0:
             dice = validation(epoch + 1, model, val_loader, criterion)
-            val={'avg_dice':dice}
-            if args.wandb=="True":
-                wandb.log(val, step = epoch)
             
             if best_dice < dice:
                 print(f"Best performance at epoch: {epoch + 1}, {best_dice:.4f} -> {dice:.4f}")
                 print(f"Save model in {args.save_dir}")
                 best_dice = dice
                 save_model(model, args)
+
+            val={'avg_dice':dice,
+                 'best_dice':best_dice}
+            if args.wandb=="True":
+                wandb.log(val, step = epoch)
 
 
 def main(args):
