@@ -284,8 +284,60 @@ class XRayDataset_Multi(Dataset):
         
         info = self.meta[self.meta['ID'] == id_num]
         
-        age = torch.tensor((int(info['나이'].iloc[0])-self.age_min)/self.age_denominator).float()
-        gender = torch.tensor(0).float() if str(info['성별'].iloc[0]).split('_')[-1] == '남' else torch.tensor(1).float()
-        weight = torch.tensor((int(info['체중(몸무게)'].iloc[0])-self.weight_min)/self.weight_denominator).float()
-        hight = torch.tensor((int(info['키(신장)'].iloc[0])-self.hight_min)/self.hight_denominator).float()
+        age = torch.tensor([(int(info['나이'].iloc[0])-self.age_min)/self.age_denominator]).float()
+        gender = torch.tensor([1,0]).float() if str(info['성별'].iloc[0]).split('_')[-1] == '남' else torch.tensor([0,1]).float()
+        weight = torch.tensor([(int(info['체중(몸무게)'].iloc[0])-self.weight_min)/self.weight_denominator]).float()
+        hight = torch.tensor([(int(info['키(신장)'].iloc[0])-self.hight_min)/self.hight_denominator]).float()
         return image, label, age, gender, weight, hight
+    
+
+
+class XRayInferenceDataset_Multi(Dataset):
+    def __init__(self, transforms=None):
+        pngs = check_size_of_dataset(TEST_ROOT, False)
+        
+        _filenames = pngs
+        _filenames = np.array(sorted(_filenames))
+        
+        self.filenames = _filenames
+        self.transforms = transforms
+        self.meta = pd.read_excel('/opt/ml/input/data/meta_data.xlsx')
+        self.age_max = 69
+        self.age_min = 19
+        self.age_denominator = self.age_max - self.age_min
+        self.weight_max = 118
+        self.weight_min = 42
+        self.weight_denominator = self.weight_max - self.weight_min
+        self.hight_max = 187
+        self.hight_min = 150
+        self.hight_denominator = self.hight_max - self.hight_min
+    
+    def __len__(self):
+        return len(self.filenames)
+    
+    def __getitem__(self, item):
+        image_name = self.filenames[item]
+        image_path = os.path.join(TEST_ROOT, image_name)
+        id_num = int(image_path.split('/')[-2][-3:])
+        
+        image = cv2.imread(image_path)
+        image = image / 255.
+        
+        if self.transforms is not None:
+            inputs = {"image": image}
+            result = self.transforms(**inputs)
+            image = result["image"]
+
+        # to tenser will be done later
+        image = image.transpose(2, 0, 1)    # make channel first
+        
+        image = torch.from_numpy(image).float()
+
+        info = self.meta[self.meta['ID'] == id_num]
+        
+        age = torch.tensor([(int(info['나이'].iloc[0])-self.age_min)/self.age_denominator]).float()
+        gender = torch.tensor([1,0]).float() if str(info['성별'].iloc[0]).split('_')[-1] == '남' else torch.tensor([0,1]).float()
+        weight = torch.tensor([(int(info['체중(몸무게)'].iloc[0])-self.weight_min)/self.weight_denominator]).float()
+        hight = torch.tensor([(int(info['키(신장)'].iloc[0])-self.hight_min)/self.hight_denominator]).float()
+            
+        return image, image_name, age, gender, weight, hight
