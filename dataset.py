@@ -223,6 +223,15 @@ class XRayDataset_Multi(Dataset):
         self.is_train = is_train
         self.transforms = transforms
         self.meta = pd.read_excel('/opt/ml/input/data/meta_data.xlsx')
+        self.age_max = 69
+        self.age_min = 19
+        self.age_denominator = self.age_max - self.age_min
+        self.weight_max = 118
+        self.weight_min = 42
+        self.weight_denominator = self.weight_max - self.weight_min
+        self.hight_max = 187
+        self.hight_min = 150
+        self.hight_denominator = self.hight_max - self.hight_min
        
     
     def __len__(self):
@@ -269,18 +278,14 @@ class XRayDataset_Multi(Dataset):
         # to tenser will be done later
         image = image.transpose(2, 0, 1)    # make channel first
         label = label.transpose(2, 0, 1)
-
+        
         image = torch.from_numpy(image).float()
-
         label = torch.from_numpy(label).float()
-
+        
         info = self.meta[self.meta['ID'] == id_num]
-        age = torch.tensor(int(info['나이'].iloc[0])).float()
-
+        
+        age = torch.tensor((int(info['나이'].iloc[0])-self.age_min)/self.age_denominator).float()
         gender = torch.tensor(0).float() if str(info['성별'].iloc[0]).split('_')[-1] == '남' else torch.tensor(1).float()
-
-        weight = torch.tensor(int(info['체중(몸무게)'].iloc[0])).float()
-
-        hight = torch.tensor(int(info['키(신장)'].iloc[0])).float()
-            
+        weight = torch.tensor((int(info['체중(몸무게)'].iloc[0])-self.weight_min)/self.weight_denominator).float()
+        hight = torch.tensor((int(info['키(신장)'].iloc[0])-self.hight_min)/self.hight_denominator).float()
         return image, label, age, gender, weight, hight
