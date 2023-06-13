@@ -7,7 +7,6 @@ import hrnet
 import torch.nn.functional as F
 
 
-
 # torchvision
 class Deeplabv3(nn.Module):
     def __init__(self, num_classes=29, encoder = "resnet50"):
@@ -51,8 +50,22 @@ class FPN(nn.Module):
     def forward(self, x):
         out = self.net(x)
         return out
-    
 
+class MAnet(nn.Module):
+    def __init__(self, num_classes=29, encoder = "resnet50"):
+        super().__init__()
+        self.net = smp.MAnet(
+            encoder_name=encoder,        # choose encoder, e.g. mobilenet_v2 or efficientnet-b7
+            encoder_weights="imagenet",     # use `imagenet` pre-trained weights for encoder initialization
+            in_channels=3,                  # model input channels (1 for gray-scale images, 3 for RGB, etc.)
+            classes=num_classes,                     # model output channels (number of classes in your dataset)
+            activation="identity"
+        )
+
+    def forward(self, x):
+        out = self.net(x)
+        return out
+      
 # hrnet
 class  HRNet(nn.Module):
     def __init__(self, name='hrnet48',pretrained ="/opt/ml/weights/hrnetv2_w48_imagenet_pretrained.pth",num_classes=29, encoder = 'HR'):
@@ -64,7 +77,6 @@ class  HRNet(nn.Module):
         out = F.interpolate(out, size=(512, 512), mode="bilinear")
         return out
     
-
 # pretrained weight
 
 class Pretrained_torchvision(nn.Module):
