@@ -40,7 +40,7 @@ my_table = wandb.Table(
 def check_path(path):
     # 가중치 저장 경로 설정
     if not os.path.isdir(path):                                                           
-        os.mkdir(path)
+        os.makedirs(path)
 
 def make_dataset(debug="False"):
     # dataset load
@@ -213,7 +213,6 @@ def train(model, data_loader, val_loader, criterion, optimizer, args):
         # validation 주기에 따른 loss 출력 및 best model 저장
         if (epoch + 1) % args.val_every == 0:
             dice = validation(epoch + 1, model, val_loader, criterion)
-            val={'avg_dice':dice}
             if args.wandb=="True":
                 wandb.log(val, step = epoch)
             
@@ -222,6 +221,11 @@ def train(model, data_loader, val_loader, criterion, optimizer, args):
                 print(f"Save model in {args.save_dir}")
                 best_dice = dice
                 save_model(model, args)
+
+            val={'avg_dice':dice,
+                 'best_dice':best_dice}
+            if args.wandb=="True":
+                wandb.log(val, step = epoch)
 
     wandb.log({"Table Name": my_table}, step=epoch) 
 
@@ -260,7 +264,7 @@ if __name__ == '__main__':
     parser.add_argument("--save_dir", type=str, default="/opt/ml/input/weights/")
     parser.add_argument("--model_path", type=str, default="/opt/ml/input/weights/albumentation/FPN_densenet161_150.pt")
     parser.add_argument("--debug", type=str, default="False")
-    parser.add_argument("--transform",type=str, default="True")
+    parser.add_argument("--transform",type=str, default="False")
 
 
     args = parser.parse_args()

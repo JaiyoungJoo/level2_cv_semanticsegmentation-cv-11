@@ -233,6 +233,196 @@ class XRayDataset(Dataset):
             
         return image, label
     
+
+class XRayDataset_path(Dataset):
+    def __init__(self, is_train=True, transforms=None, seed = 21):
+        pngs, jsons = check_size_of_dataset(IMAGE_ROOT, LABEL_ROOT)
+
+        _filenames = np.array(pngs)
+        _labelnames = np.array(jsons)
+        
+        # split train-valid
+        # 한 폴더 안에 한 인물의 양손에 대한 `.dcm` 파일이 존재하기 때문에
+        # 폴더 이름을 그룹으로 해서 GroupKFold를 수행합니다.
+        # 동일 인물의 손이 train, valid에 따로 들어가는 것을 방지합니다.
+        groups = [os.path.dirname(fname) for fname in _filenames]
+        
+        # dummy label
+        ys = [0 for fname in _filenames]
+        
+        # 전체 데이터의 20%를 validation data로 쓰기 위해 `n_splits`를
+        # 5으로 설정하여 KFold를 수행합니다.
+        gkf = GroupKFold(n_splits=5)
+        
+        filenames = []
+        labelnames = []
+        for i, (x, y) in enumerate(gkf.split(_filenames, ys, groups)):
+            if is_train:
+                # 0번을 validation dataset으로 사용합니다.
+                if i == (seed+4)%5:
+                    continue
+                    
+                filenames += list(_filenames[y])
+                labelnames += list(_labelnames[y])
+            
+            else:
+                filenames = list(_filenames[y])
+                labelnames = list(_labelnames[y])
+                
+                # skip i > 0
+                break
+        
+        self.filenames = filenames
+        self.labelnames = labelnames
+        self.is_train = is_train
+        self.transforms = transforms
+       
+    
+    def __len__(self):
+        return len(self.filenames)
+    
+    def __getitem__(self, item):
+        image_name = self.filenames[item]
+        image_path = os.path.join(IMAGE_ROOT, image_name)
+        
+        
+        image = cv2.imread(image_path)
+        image = image / 255.
+        
+        label_name = self.labelnames[item]
+        label_path = os.path.join(LABEL_ROOT, label_name)
+        
+        # process a label of shape (H, W, NC)
+        label_shape = tuple(image.shape[:2]) + (len(CLASSES), )
+        label = np.zeros(label_shape, dtype=np.uint8)
+        
+        # read label file
+        with open(label_path, "r") as f:
+            annotations = json.load(f)
+        annotations = annotations["annotations"]
+        
+        # iterate each class
+        for ann in annotations:
+            c = ann["label"]
+            class_ind = CLASS2IND[c]
+            points = np.array(ann["points"])
+            
+            # polygon to mask
+            class_label = np.zeros(image.shape[:2], dtype=np.uint8)
+            cv2.fillPoly(class_label, [points], 1)
+            label[..., class_ind] = class_label
+        
+        if self.transforms is not None:
+            inputs = {"image": image, "mask": label} if self.is_train else {"image": image}
+            result = self.transforms(**inputs)
+            
+            image = result["image"]
+            label = result["mask"] if self.is_train else label
+
+        # to tenser will be done later
+        image = image.transpose(2, 0, 1)    # make channel first
+        label = label.transpose(2, 0, 1)
+        
+        image = torch.from_numpy(image).float().half()
+        label = torch.from_numpy(label).float().half()
+            
+        return image, label, image_path    
+    
+class XRayDataset_valid(Dataset):
+    def __init__(self, is_train=True, transforms=None, seed = 21):
+        pngs, jsons = check_size_of_dataset(IMAGE_ROOT, LABEL_ROOT)
+
+        _filenames = np.array(pngs)
+        _labelnames = np.array(jsons)
+        
+        # split train-valid
+        # 한 폴더 안에 한 인물의 양손에 대한 `.dcm` 파일이 존재하기 때문에
+        # 폴더 이름을 그룹으로 해서 GroupKFold를 수행합니다.
+        # 동일 인물의 손이 train, valid에 따로 들어가는 것을 방지합니다.
+        groups = [os.path.dirname(fname) for fname in _filenames]
+        
+        # dummy label
+        ys = [0 for fname in _filenames]
+        
+        # 전체 데이터의 20%를 validation data로 쓰기 위해 `n_splits`를
+        # 5으로 설정하여 KFold를 수행합니다.
+        gkf = GroupKFold(n_splits=5)
+        
+        filenames = []
+        labelnames = []
+        for i, (x, y) in enumerate(gkf.split(_filenames, ys, groups)):
+            if is_train:
+                # 0번을 validation dataset으로 사용합니다.
+                if i == (seed+4)%5:
+                    continue
+                    
+                filenames += list(_filenames[y])
+                labelnames += list(_labelnames[y])
+            
+            else:
+                filenames = list(_filenames[y])
+                labelnames = list(_labelnames[y])
+                
+                # skip i > 0
+                break
+        
+        self.filenames = filenames
+        self.labelnames = labelnames
+        self.is_train = is_train
+        self.transforms = transforms
+       
+    
+    def __len__(self):
+        return len(self.filenames)
+    
+    def __getitem__(self, item):
+        image_name = self.filenames[item]
+        image_path = os.path.join(IMAGE_ROOT, image_name)
+        
+        
+        image = cv2.imread(image_path)
+        image = image / 255.
+        
+        label_name = self.labelnames[item]
+        label_path = os.path.join(LABEL_ROOT, label_name)
+        
+        # process a label of shape (H, W, NC)
+        label_shape = tuple(image.shape[:2]) + (len(CLASSES), )
+        label = np.zeros(label_shape, dtype=np.uint8)
+        
+        # read label file
+        with open(label_path, "r") as f:
+            annotations = json.load(f)
+        annotations = annotations["annotations"]
+        
+        # iterate each class
+        for ann in annotations:
+            c = ann["label"]
+            class_ind = CLASS2IND[c]
+            points = np.array(ann["points"])
+            
+            # polygon to mask
+            class_label = np.zeros(image.shape[:2], dtype=np.uint8)
+            cv2.fillPoly(class_label, [points], 1)
+            label[..., class_ind] = class_label
+        
+        if self.transforms is not None:
+            inputs = {"image": image, "mask": label} if self.is_train else {"image": image}
+            result = self.transforms(**inputs)
+            
+            image = result["image"]
+            label = result["mask"] if self.is_train else label
+
+        # to tenser will be done later
+        image = image.transpose(2, 0, 1)    # make channel first
+        label = label.transpose(2, 0, 1)
+        
+        image = torch.from_numpy(image).float()
+        label = torch.from_numpy(label).float()
+            
+        return image, image_name, label   
+ 
+
 class XRayDataset_Multi(Dataset):
     def __init__(self, is_train=True, transforms=None, seed = 21):
         pngs, jsons = check_size_of_dataset(IMAGE_ROOT, LABEL_ROOT)
@@ -276,6 +466,15 @@ class XRayDataset_Multi(Dataset):
         self.is_train = is_train
         self.transforms = transforms
         self.meta = pd.read_excel('/opt/ml/input/data/meta_data.xlsx')
+        self.age_max = 69
+        self.age_min = 19
+        self.age_denominator = self.age_max - self.age_min
+        self.weight_max = 118
+        self.weight_min = 42
+        self.weight_denominator = self.weight_max - self.weight_min
+        self.hight_max = 187
+        self.hight_min = 150
+        self.hight_denominator = self.hight_max - self.hight_min
        
     
     def __len__(self):
@@ -322,18 +521,66 @@ class XRayDataset_Multi(Dataset):
         # to tenser will be done later
         image = image.transpose(2, 0, 1)    # make channel first
         label = label.transpose(2, 0, 1)
+        
+        image = torch.from_numpy(image).float()
+        label = torch.from_numpy(label).float()
+        
+        info = self.meta[self.meta['ID'] == id_num]
+        
+        age = torch.tensor([(int(info['나이'].iloc[0])-self.age_min)/self.age_denominator]).float()
+        gender = torch.tensor([1,0]).float() if str(info['성별'].iloc[0]).split('_')[-1] == '남' else torch.tensor([0,1]).float()
+        weight = torch.tensor([(int(info['체중(몸무게)'].iloc[0])-self.weight_min)/self.weight_denominator]).float()
+        hight = torch.tensor([(int(info['키(신장)'].iloc[0])-self.hight_min)/self.hight_denominator]).float()
+        return image, label, age, gender, weight, hight
+    
 
+
+class XRayInferenceDataset_Multi(Dataset):
+    def __init__(self, transforms=None):
+        pngs = check_size_of_dataset(TEST_ROOT, False)
+        
+        _filenames = pngs
+        _filenames = np.array(sorted(_filenames))
+        
+        self.filenames = _filenames
+        self.transforms = transforms
+        self.meta = pd.read_excel('/opt/ml/input/data/meta_data.xlsx')
+        self.age_max = 69
+        self.age_min = 19
+        self.age_denominator = self.age_max - self.age_min
+        self.weight_max = 118
+        self.weight_min = 42
+        self.weight_denominator = self.weight_max - self.weight_min
+        self.hight_max = 187
+        self.hight_min = 150
+        self.hight_denominator = self.hight_max - self.hight_min
+    
+    def __len__(self):
+        return len(self.filenames)
+    
+    def __getitem__(self, item):
+        image_name = self.filenames[item]
+        image_path = os.path.join(TEST_ROOT, image_name)
+        id_num = int(image_path.split('/')[-2][-3:])
+        
+        image = cv2.imread(image_path)
+        image = image / 255.
+        
+        if self.transforms is not None:
+            inputs = {"image": image}
+            result = self.transforms(**inputs)
+            image = result["image"]
+
+        # to tenser will be done later
+        image = image.transpose(2, 0, 1)    # make channel first
+        
         image = torch.from_numpy(image).float()
 
-        label = torch.from_numpy(label).float()
-
         info = self.meta[self.meta['ID'] == id_num]
-        age = torch.tensor(int(info['나이'].iloc[0])).float()
-
-        gender = torch.tensor(0).float() if str(info['성별'].iloc[0]).split('_')[-1] == '남' else torch.tensor(1).float()
-
-        weight = torch.tensor(int(info['체중(몸무게)'].iloc[0])).float()
-
-        hight = torch.tensor(int(info['키(신장)'].iloc[0])).float()
+        
+        age = torch.tensor([(int(info['나이'].iloc[0])-self.age_min)/self.age_denominator]).float()
+        gender = torch.tensor([1,0]).float() if str(info['성별'].iloc[0]).split('_')[-1] == '남' else torch.tensor([0,1]).float()
+        weight = torch.tensor([(int(info['체중(몸무게)'].iloc[0])-self.weight_min)/self.weight_denominator]).float()
+        hight = torch.tensor([(int(info['키(신장)'].iloc[0])-self.hight_min)/self.hight_denominator]).float()
             
-        return image, label, age, gender, weight, hight
+        return image, image_name, age, gender, weight, hight

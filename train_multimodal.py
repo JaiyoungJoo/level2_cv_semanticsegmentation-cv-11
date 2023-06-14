@@ -133,10 +133,10 @@ def validation(epoch, model, data_loader, criterion, thr=0.5):
                 outputs = F.interpolate(outputs, size=(mask_h, mask_w), mode="bilinear")
             
             segmentation_criterion = criterion(outputs, masks)
-            age_criterion =  getattr(import_module("loss"), 'mse_loss')(ages_, ages.unsqueeze(1))
-            genders_criterion =  getattr(import_module("loss"), 'bce_loss')(genders_, genders.unsqueeze(1))
-            weights_criterion =  getattr(import_module("loss"), 'mse_loss')(weights_, weights.unsqueeze(1))
-            hights_criterion =  getattr(import_module("loss"), 'mse_loss')(hights_, hights.unsqueeze(1))
+            age_criterion =  getattr(import_module("loss"), 'mse_loss')(ages_, ages)
+            genders_criterion =  getattr(import_module("loss"), 'bce_loss')(genders_, genders)
+            weights_criterion =  getattr(import_module("loss"), 'mse_loss')(weights_, weights)
+            hights_criterion =  getattr(import_module("loss"), 'mse_loss')(hights_, hights)
 
             loss = segmentation_criterion*0.5 + age_criterion*0.1 + genders_criterion*0.1 + weights_criterion*0.1 + hights_criterion*0.1
             total_loss += loss
@@ -192,40 +192,66 @@ def train(model, data_loader, val_loader, criterion, optimizer, args):
 
             # loss 계산
             segmentation_criterion = criterion(outputs, masks)
-            age_criterion =  getattr(import_module("loss"), 'mse_loss')(ages_, ages.unsqueeze(1))
-            genders_criterion =  getattr(import_module("loss"), 'bce_loss')(genders_, genders.unsqueeze(1))
-            weights_criterion =  getattr(import_module("loss"), 'mse_loss')(weights_, weights.unsqueeze(1))
-            hights_criterion =  getattr(import_module("loss"), 'mse_loss')(hights_, hights.unsqueeze(1))
+            age_criterion =  getattr(import_module("loss"), 'mse_loss')(ages_, ages)
+            genders_criterion =  getattr(import_module("loss"), 'bce_loss')(genders_, genders)
+            weights_criterion =  getattr(import_module("loss"), 'mse_loss')(weights_, weights)
+            hights_criterion =  getattr(import_module("loss"), 'mse_loss')(hights_, hights)
 
             loss = segmentation_criterion*0.5 + age_criterion*0.1 + genders_criterion*0.1 + weights_criterion*0.1 + hights_criterion*0.1
+            
+            
+            #print(f'age_pred: {ages_} ')
+            #print(f'age_label: {ages.unsqueeze(1)} ')
+            #print(f'gender_pred: {genders_} ')
+            #print(f'gender_label: {genders.unsqueeze(1)} ')
+            #print(f'weight_pred: {weights_} ')
+            #print(f'weight_label: {weights.unsqueeze(1)} ')
+            #print(f'hight_pred: {hights_} ')
+            #print(f'hight_label: {hights.unsqueeze(1)} ')
+                
+            
+            
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
             
             # step 주기에 따른 loss 출력
-            if (step + 1) % 25 == 0:
+            if (step + 1) % 20 == 0:
                 print(
                     f'{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")} | '
                     f'Epoch [{epoch+1}/{args.epochs}], '
                     f'Step [{step+1}/{len(data_loader)}], '
-                    f'Loss: {round(loss.item(),4)}'
+                    f'Total_Loss:{round(loss.item(),4)}, '
+                    f'seg_Loss: {round(segmentation_criterion.item(),4)} '
+                    f'age_Loss: {round(age_criterion.item(),4)} '
+                    f'gender_Loss: {round(genders_criterion.item(),4)} '
+                    f'weight_Loss: {round(weights_criterion.item(),4)} '
+                    f'hight_Loss: {round(hights_criterion.item(),4)} '
                 )
-            train={'Loss':round(loss.item(),4)}
+            train={'Loss':round(loss.item(),4),
+                   'seg_Loss': round(segmentation_criterion.item(),4),
+                    'age_Loss': round(age_criterion.item(),4),
+                    'gender_Loss': round(genders_criterion.item(),4),
+                    'weight_Loss': round(weights_criterion.item(),4),
+                    'hight_Loss': round(hights_criterion.item(),4)}
+            
             if args.wandb=="True":
                 wandb.log(train, step = epoch)
              
         # validation 주기에 따른 loss 출력 및 best model 저장
         if (epoch + 1) % args.val_every == 0:
             dice = validation(epoch + 1, model, val_loader, criterion)
-            val={'avg_dice':dice}
-            if args.wandb=="True":
-                wandb.log(val, step = epoch)
             
             if best_dice < dice:
                 print(f"Best performance at epoch: {epoch + 1}, {best_dice:.4f} -> {dice:.4f}")
                 print(f"Save model in {args.save_dir}")
                 best_dice = dice
                 save_model(model, args)
+
+            val={'avg_dice':dice,
+                 'best_dice':best_dice}
+            if args.wandb=="True":
+                wandb.log(val, step = epoch)
 
 
 def main(args):
@@ -234,6 +260,8 @@ def main(args):
     if args.model == 'Pretrained_torchvision':
         model = getattr(import_module("model"), args.model)(model = args.model_path)
     elif args.model == 'Pretrained_smp':
+        model = getattr(import_module("model"), args.model)(model = args.model_path)
+    elif args.model == 'Pretrained_Multimodal':
         model = getattr(import_module("model"), args.model)(model = args.model_path)
     else : 
         model = getattr(import_module("model"), args.model)(encoder = args.encoder)
@@ -255,18 +283,18 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", default=21, help="random seed (default: 21)")
     parser.add_argument("--loss", type=str, default="bce_loss")
-    parser.add_argument("--model", type=str, default="MultiModal")
+    parser.add_argument("--model", type=str, default="MultiModalV2")
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--val_every", type=int, default=1)
     parser.add_argument("--wandb", type=str, default="True")
-    parser.add_argument("--encoder", type=str, default="resnet101")
+    parser.add_argument("--encoder", type=str, default="hrnet")
     parser.add_argument("--save_dir", type=str, default="/opt/ml/weights/")
-    parser.add_argument("--model_path", type=str, default="/opt/ml/weights/fcn_resnet101_best_model.pt")
+    parser.add_argument("--model_path", type=str, default="/opt/ml/weights/MultiModalV2/MultiModalV2_hrnet_100.pt")
     parser.add_argument("--debug", type=str, default="False")
 
 
     args = parser.parse_args()
-    if args.model == 'Pretrained_torchvision' or 'Pretrained_smp':
+    if args.model == 'Pretrained_torchvision' or args.model == 'Pretrained_smp' or args.model == 'Pretrained_Multimodal':
         args.save_dir = os.path.join(args.save_dir, args.model_path.split('/')[-1].split('.')[0])
     else:
         args.save_dir = os.path.join(args.save_dir, args.model)
