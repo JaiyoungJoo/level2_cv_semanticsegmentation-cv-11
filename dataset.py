@@ -55,18 +55,48 @@ def check_size_of_dataset(IMAGE_ROOT, LABEL_ROOT):
         return pngs, jsons
     else:
         return pngs
-        
+
+def equalize_and_remove_black(image, **kwargs):
+    # 평활화 적용
+    image = cv2.convertScaleAbs(image)
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    equalized = cv2.equalizeHist(gray)
+
+    # 검은색 부분 제거
+    mask = equalized > 200
+    result = np.zeros_like(image)
+    result[mask] = image[mask]
+
+    return result
+
+def clahe(image, **kwargs):
+    image = cv2.convertScaleAbs(image)
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    image = image.astype(np.uint8)
+    # CLAHE 적용
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    clahe_image = clahe.apply(image)
+    rgb_image = cv2.cvtColor(clahe_image, cv2.COLOR_GRAY2RGB)
+    return rgb_image
+    
+def clahe2(image, **kwargs):
+    # Albumentations의 CLAHE 적용
+    image = image.astype(np.uint8)
+    transform = A.CLAHE(clip_limit=2.0, tile_grid_size=(8, 8), always_apply=True)
+    transformed_image = transform(image=image)["image"]
+    return transformed_image
+
 def get_transform():
     train_transform = [
-        A.RandomContrast(limit=[0,0.5],p=1),
+        # A.Lambda(image=clahe2),
+        A.RandomContrast(limit=[0,0.5], p=1),
         # A.CenterCrop(1900,1500),
+        # A.Lambda(image=equalize_and_remove_black),
         A.Resize(512, 512),
-        # A.pytorch.ToTensorV2()
-
+        A.Rotate(limit=45)
     ]
     val_transform = [
         A.Resize(512, 512),
-        # A.pytorch.ToTensorV2()
     ]
 
     return A.Compose(train_transform), A.Compose(val_transform)
@@ -182,10 +212,16 @@ class XRayDataset(Dataset):
             label[..., class_ind] = class_label
         
         if self.transforms is not None:
+            # if any(isinstance(t, A.CLAHE) for t in self.transforms.transforms):
+            #     image = image.astype(np.uint8)  # 데이터 타입을 uint8로 변환
             inputs = {"image": image, "mask": label} if self.is_train else {"image": image}
             result = self.transforms(**inputs)
             
+            # if any(isinstance(t, A.CLAHE) for t in self.transforms.transforms):
+            # image = result["image"].astype(np.float32)
+            # else:
             image = result["image"]
+
             label = result["mask"] if self.is_train else label
 
         # to tenser will be done later
