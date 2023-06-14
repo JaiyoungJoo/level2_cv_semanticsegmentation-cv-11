@@ -3,3 +3,6 @@ __pycache__
 grad_images
 *.out
 *.sh
+train*
+weights/*
+/jupyter*
