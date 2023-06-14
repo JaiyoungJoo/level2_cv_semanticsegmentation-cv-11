@@ -68,7 +68,7 @@ class MAnet(nn.Module):
       
 # hrnet
 class  HRNet(nn.Module):
-    def __init__(self, name='hrnet48',pretrained ="/opt/ml/weights/hrnetv2_w48_imagenet_pretrained.pth",num_classes=29, encoder = 'HR'):
+    def __init__(self, name='hrnet48',pretrained ="/opt/ml/weights/MultiModalV2/hrnetv2_w48_imagenet_pretrained.pth",num_classes=29, encoder = 'HR'):
         super().__init__()
         self.net = hrnet.get_ocr_model(name = name, pretrained=pretrained)
     
@@ -96,6 +96,15 @@ class Pretrained_smp(nn.Module):
     def forward(self, x):
         out = self.net(x)
         return out
+    
+class Pretrained_Multimodal(nn.Module):
+    def __init__(self,  model = "/opt/ml/weights/fpn_resnet101_best_model.pt"):
+        super().__init__()
+        self.net = torch.load(model)
+
+    def forward(self, x, age, gender, weight, hight):
+        out_segment, out_age, out_gender, out_weight, out_hight = self.net(x, age, gender, weight, hight)
+        return out_segment, out_age, out_gender, out_weight, out_hight
     
 
 # multi modal
