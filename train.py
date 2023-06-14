@@ -40,7 +40,7 @@ my_table = wandb.Table(
 def check_path(path):
     # 가중치 저장 경로 설정
     if not os.path.isdir(path):                                                           
-        os.mkdir(path)
+        os.makedirs(path)
 
 def make_dataset(debug="False"):
     # dataset load
