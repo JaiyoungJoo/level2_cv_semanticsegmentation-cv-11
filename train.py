@@ -264,7 +264,7 @@ if __name__ == '__main__':
     parser.add_argument("--save_dir", type=str, default="/opt/ml/input/weights/")
     parser.add_argument("--model_path", type=str, default="/opt/ml/input/weights/albumentation/FPN_densenet161_150.pt")
     parser.add_argument("--debug", type=str, default="False")
-    parser.add_argument("--transform",type=str, default="True")
+    parser.add_argument("--transform",type=str, default="False")
 
 
     args = parser.parse_args()
