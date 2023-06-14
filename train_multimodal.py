@@ -261,6 +261,8 @@ def main(args):
         model = getattr(import_module("model"), args.model)(model = args.model_path)
     elif args.model == 'Pretrained_smp':
         model = getattr(import_module("model"), args.model)(model = args.model_path)
+    elif args.model == 'Pretrained_Multimodal':
+        model = getattr(import_module("model"), args.model)(model = args.model_path)
     else : 
         model = getattr(import_module("model"), args.model)(encoder = args.encoder)
 
@@ -287,12 +289,12 @@ if __name__ == '__main__':
     parser.add_argument("--wandb", type=str, default="True")
     parser.add_argument("--encoder", type=str, default="hrnet")
     parser.add_argument("--save_dir", type=str, default="/opt/ml/weights/")
-    parser.add_argument("--model_path", type=str, default="/opt/ml/weights/fcn_resnet101_best_model.pt")
+    parser.add_argument("--model_path", type=str, default="/opt/ml/weights/MultiModalV2/MultiModalV2_hrnet_100.pt")
     parser.add_argument("--debug", type=str, default="False")
 
 
     args = parser.parse_args()
-    if args.model == 'Pretrained_torchvision' or args.model == 'Pretrained_smp':
+    if args.model == 'Pretrained_torchvision' or args.model == 'Pretrained_smp' or args.model == 'Pretrained_Multimodal':
         args.save_dir = os.path.join(args.save_dir, args.model_path.split('/')[-1].split('.')[0])
     else:
         args.save_dir = os.path.join(args.save_dir, args.model)
