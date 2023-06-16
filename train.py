@@ -213,8 +213,6 @@ def train(model, data_loader, val_loader, criterion, optimizer, args):
         # validation 주기에 따른 loss 출력 및 best model 저장
         if (epoch + 1) % args.val_every == 0:
             dice = validation(epoch + 1, model, val_loader, criterion)
-            if args.wandb=="True":
-                wandb.log(val, step = epoch)
             
             if best_dice < dice:
                 print(f"Best performance at epoch: {epoch + 1}, {best_dice:.4f} -> {dice:.4f}")
@@ -224,6 +222,7 @@ def train(model, data_loader, val_loader, criterion, optimizer, args):
 
             val={'avg_dice':dice,
                  'best_dice':best_dice}
+            
             if args.wandb=="True":
                 wandb.log(val, step = epoch)
 
