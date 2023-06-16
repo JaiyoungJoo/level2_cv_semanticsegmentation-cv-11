@@ -51,11 +51,11 @@ def make_dataset(debug="False"):
     tf = A.Resize(512, 512)
     train_transform, val_transform = get_transform()
     if args.transform=='True':
-        train_dataset = XRayDataset(is_train=True, transforms=train_transform)
-        valid_dataset = XRayDataset(is_train=False, transforms=val_transform)
+        train_dataset = XRayDataset(is_train=True, transforms=train_transform, dataclean=args.dataclean)
+        valid_dataset = XRayDataset(is_train=False, transforms=val_transform, dataclean=args.dataclean)
     else:
-        train_dataset = XRayDataset(is_train=True, transforms=tf)
-        valid_dataset = XRayDataset(is_train=False, transforms=tf)
+        train_dataset = XRayDataset(is_train=True, transforms=tf, dataclean=args.dataclean)
+        valid_dataset = XRayDataset(is_train=False, transforms=tf, dataclean=args.dataclean)
     if debug=="True":
         train_subset_size = int(len(train_dataset) * 0.1)
 
@@ -276,6 +276,7 @@ if __name__ == '__main__':
     parser.add_argument("--debug", type=str, default="False")
     parser.add_argument("--transform",type=str, default="False")
     parser.add_argument("--acc_steps", type=int, default="1")
+    parser.add_argument("--dataclean",type=str, default="False")
 
     args = parser.parse_args()
     if args.model == 'Pretrained_torchvision' or 'Pretrained_smp':
