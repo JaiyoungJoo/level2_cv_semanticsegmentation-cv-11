@@ -203,6 +203,11 @@ class XRayDataset(Dataset):
         self.labelnames = labelnames
         if self.dataclean:
             self.labelnames = list(set(self.labelnames) - set(ABNORMAL_JSONS))
+            print("#########################################################")
+            print("Data Cleaning....")
+            print('filenames', len(self.filenames))
+            print('labelnames', len(self.labelnames))
+            print("#########################################################")
         self.is_train = is_train
         self.transforms = transforms
    
