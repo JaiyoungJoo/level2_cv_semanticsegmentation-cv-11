@@ -23,6 +23,10 @@ from dataset import XRayDataset
 from dataset import get_transform
 ssl._create_default_https_context = ssl._create_unverified_context
 
+# for time check
+import time
+from pytz import timezone
+
 # exp setting
 BATCH_SIZE = 8
 LR = 1e-4
@@ -94,7 +98,7 @@ def dice_coef(y_true, y_pred):
 
 def save_model(model, args):
     
-    output_path = os.path.join(args.save_dir, f"{args.model}_{args.encoder}_{args.loss}_{args.epochs}.pt")    #아래의 wandb쪽의 name과 동시 수정할것
+    output_path = os.path.join(args.save_dir, f"{args.model}_{args.encoder}_{args.loss}_{args.epochs}_step_1_acctest.pt")    #아래의 wandb쪽의 name과 동시 수정할것
     torch.save(model, output_path)
 
 def set_seed(seed):
@@ -113,7 +117,7 @@ def wandb_config(args):
                     'max_epoch':args.epochs},
             project='Segmentation',
             entity='aivengers_seg',
-            name=f'{args.model}_{args.encoder}_{args.loss}_{args.epochs}'
+            name=f'{args.model}_{args.encoder}_{args.loss}_{args.epochs}_step_1_acctest'
             )
 
 def validation(epoch, model, data_loader, criterion, thr=0.5):
@@ -183,7 +187,7 @@ def train(model, data_loader, val_loader, criterion, optimizer, args):
 
 
         model.train()
-
+        step_count = 0
         for step, (images, masks) in enumerate(data_loader):            
             # gpu 연산을 위해 device 할당
             images, masks = images.cuda(), masks.cuda()
@@ -194,14 +198,21 @@ def train(model, data_loader, val_loader, criterion, optimizer, args):
             
             # loss 계산
             loss = criterion(outputs, masks)
-            optimizer.zero_grad()
+            loss = loss / args.acc_steps # 경사를 경사 누적 스텝 수로 나눔
             loss.backward()
-            optimizer.step()
+            step_count += 1
+            if step_count % args.acc_steps == 0:
+                optimizer.step()
+                optimizer.zero_grad()
+                step_count = 0
+            # 경사 업데이트 없이 스텝을 끝마치기 전에 경사 초기화
+            if step_count != 0 and (step_count % args.acc_steps) != 0:
+                optimizer.zero_grad()
             
             # step 주기에 따른 loss 출력
             if (step + 1) % 25 == 0:
                 print(
-                    f'{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")} | '
+                    f'{datetime.datetime.now(timezone("Asia/Seoul")).strftime("%Y-%m-%d %H:%M:%S")} | '
                     f'Epoch [{epoch+1}/{args.epochs}], '
                     f'Step [{step+1}/{len(data_loader)}], '
                     f'Loss: {round(loss.item(),4)}'
@@ -256,15 +267,15 @@ if __name__ == '__main__':
     parser.add_argument("--seed", default=21, help="random seed (default: 21)")
     parser.add_argument("--loss", type=str, default="bce_loss")
     parser.add_argument("--model", type=str, default="FCN")
-    parser.add_argument("--epochs", type=int, default=100)
-    parser.add_argument("--val_every", type=int, default=5)
+    parser.add_argument("--epochs", type=int, default=200)
+    parser.add_argument("--val_every", type=int, default=1)
     parser.add_argument("--wandb", type=str, default="True")
-    parser.add_argument("--encoder", type=str, default="resnet101")
+    parser.add_argument("--encoder", type=str, default="resnet50")
     parser.add_argument("--save_dir", type=str, default="/opt/ml/input/weights/")
     parser.add_argument("--model_path", type=str, default="/opt/ml/input/weights/albumentation/FPN_densenet161_150.pt")
     parser.add_argument("--debug", type=str, default="False")
     parser.add_argument("--transform",type=str, default="False")
-
+    parser.add_argument("--acc_steps", type=int, default="1")
 
     args = parser.parse_args()
     if args.model == 'Pretrained_torchvision' or 'Pretrained_smp':
