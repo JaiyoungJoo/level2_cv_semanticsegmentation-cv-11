@@ -96,7 +96,7 @@ def main():
          A.CenterCrop(1900,1500),
          A.Resize(512, 512)])
 
-    test_dataset = dataset.XRayInferenceDataset(transforms=tf1)
+    test_dataset = dataset.XRayInferenceDataset(transforms=tf)
 
     test_loader = DataLoader(
         dataset=test_dataset, 
@@ -159,6 +159,3 @@ if __name__ == '__main__':
     MODEL_NAME = MODEL_NAME.replace('_best_model', '')
     
     main()
-    
-
-    
