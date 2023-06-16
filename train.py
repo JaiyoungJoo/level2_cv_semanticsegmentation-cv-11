@@ -283,5 +283,11 @@ if __name__ == '__main__':
     else:
         args.save_dir = os.path.join(args.save_dir, args.model)
 
+    start = time.time()
     print(args)
     main(args)
+    end = time.time()
+    sec = (end - start)
+    result = datetime.timedelta(seconds=sec)
+    result_list = str(datetime.timedelta(seconds=sec)).split(".")
+    print(result_list[0])
