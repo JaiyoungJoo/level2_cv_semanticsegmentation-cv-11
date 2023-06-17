@@ -94,7 +94,7 @@ def dice_coef(y_true, y_pred):
 
 def save_model(model, args):
     
-    output_path = os.path.join(args.save_dir, f"{args.model}_{args.encoder}_{args.loss}_{args.epochs}.pt")    #아래의 wandb쪽의 name과 동시 수정할것
+    output_path = os.path.join(args.save_dir, f"{args.model}_{args.encoder}_{args.loss}_{args.epochs}_seed:{args.seed}.pt")    #아래의 wandb쪽의 name과 동시 수정할것
     torch.save(model, output_path)
 
 def set_seed(seed):
@@ -113,7 +113,7 @@ def wandb_config(args):
                     'max_epoch':args.epochs},
             project='Segmentation',
             entity='aivengers_seg',
-            name=f'{args.model}_{args.encoder}_{args.loss}_{args.epochs}'
+            name=f'{args.model}_{args.encoder}_{args.loss}_{args.epochs}_seed:{args.seed}'
             )
 
 def validation(epoch, model, data_loader, criterion, thr=0.5):
@@ -244,7 +244,7 @@ def main(args):
         set_seed(args.seed)
         train_loader, valid_loader = make_dataset(args.debug)
     else:
-        set_seed(0)
+        set_seed(args.seed)
         train_loader, valid_loader = make_dataset()
 
     check_path(args.save_dir)
@@ -253,7 +253,7 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--seed", default=21, help="random seed (default: 21)")
+    parser.add_argument("--seed", default=0, help="random seed (default: 0), select one of [0,1,2,3,4]")
     parser.add_argument("--loss", type=str, default="bce_loss")
     parser.add_argument("--model", type=str, default="FCN")
     parser.add_argument("--epochs", type=int, default=100)
