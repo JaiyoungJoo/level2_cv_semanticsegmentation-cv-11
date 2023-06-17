@@ -267,10 +267,11 @@ if __name__ == '__main__':
 
 
     args = parser.parse_args()
-    if args.model == 'Pretrained_torchvision' or 'Pretrained_smp':
+    if args.model == 'Pretrained_torchvision' or args.model == 'Pretrained_smp':
         args.save_dir = os.path.join(args.save_dir, args.model_path.split('/')[-1].split('.')[0])
     else:
         args.save_dir = os.path.join(args.save_dir, args.model)
 
+    print(f"Model save dir: {args.save_dir}")
     print(args)
     main(args)
