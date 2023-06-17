@@ -86,10 +86,13 @@ class  HRNet(nn.Module):
     def __init__(self, name='hrnet48',pretrained ="/opt/ml/weights/MultiModalV2/hrnetv2_w48_imagenet_pretrained.pth",num_classes=29, encoder = 'HR'):
         super().__init__()
         self.net = hrnet.get_ocr_model(name = name, pretrained=pretrained)
-    
+        self.decoder = nn.sequencial(nn.ConvTranspose2d(29, 29, kernel_size=2, stride=2),
+                                     nn.ReLU(inplace=True),
+                                     nn.ConvTranspose2d(29, 29, kernel_size=2, stride=2),
+                                     nn.Softmax())
     def forward(self, x):
         out = self.net(x)
-        out = F.interpolate(out, size=(512, 512), mode="bilinear")
+        out = self.decoder(out)
         return out
     
 # pretrained weight
