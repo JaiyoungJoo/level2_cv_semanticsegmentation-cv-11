@@ -50,7 +50,22 @@ class FPN(nn.Module):
     def forward(self, x):
         out = self.net(x)
         return out
+    
+class FPN_gray(nn.Module):
+    def __init__(self, num_classes=29, encoder = "resnet50"):
+        super().__init__()
+        self.net = smp.FPN(
+            encoder_name=encoder,        # choose encoder, e.g. mobilenet_v2 or efficientnet-b7
+            encoder_weights="imagenet",     # use `imagenet` pre-trained weights for encoder initialization
+            in_channels=1,                  # model input channels (1 for gray-scale images, 3 for RGB, etc.)
+            classes=1,                     # model output channels (number of classes in your dataset)
+            activation="identity"
+        )
 
+    def forward(self, x):
+        out = self.net(x)
+        return out
+    
 class MAnet(nn.Module):
     def __init__(self, num_classes=29, encoder = "resnet50"):
         super().__init__()
