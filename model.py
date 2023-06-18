@@ -283,3 +283,58 @@ class MultiModalV2(nn.Module):
         out_hight = self.branch_hight(out) # out_flatten -> out
         
         return  out_segment, out_age, out_gender, out_weight, out_hight
+    
+
+class MultiModalV3(nn.Module):
+    def __init__(self, in_features=29, encoder = 'densenet169'):
+        super().__init__()
+
+        self.backbone = hrnet.get_ocr_model(name='hrnet48',pretrained ="/opt/ml/weights/MultiModalV2/hrnetv2_w48_imagenet_pretrained.pth")
+
+
+        self.branch_age = nn.Sequential(
+                nn.Flatten(),
+                nn.Linear(in_features,1),
+                nn.Softmax()
+            )
+        self.branch_gender = nn.Sequential(
+                nn.Flatten(),
+                nn.Linear(in_features,2),
+                nn.Softmax()
+            )
+        self.branch_weight = nn.Sequential(
+                nn.Flatten(),
+                nn.Linear(in_features,1),
+                nn.Softmax()
+            )
+        self.branch_hight = nn.Sequential(
+                nn.Flatten(),
+                nn.Linear(in_features,1),
+                nn.Softmax()
+            )
+
+        self.decoder = nn.Sequential(
+            # Define the decoder layers, such as upsampling and transposed convolutions
+            nn.ConvTranspose2d(in_features+5, in_features+5, kernel_size=2, stride=2),
+            nn.ReLU(inplace=True),
+            nn.ConvTranspose2d(in_features+5, in_features+5, kernel_size=2, stride=2),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(in_features+5, in_features, kernel_size=3, stride=1, padding=1)
+        )
+    def forward(self, x, age, gender, weight, hight):
+        out = self.backbone(x)
+        out_all = torch.cat([out, age.unsqueeze(2).unsqueeze(3).repeat(1, 1, 256, 256)], dim=1)
+        out_all = torch.cat([out_all, gender.unsqueeze(2).unsqueeze(3).repeat(1, 1, 256, 256)], dim=1)
+        out_all = torch.cat([out_all, weight.unsqueeze(2).unsqueeze(3).repeat(1, 1, 256, 256)], dim=1)
+        out_all = torch.cat([out_all, hight.unsqueeze(2).unsqueeze(3).repeat(1, 1, 256, 256)], dim=1)
+
+        out_segment = self.decoder(out_all)
+
+        ap = F.adaptive_avg_pool2d(out, (1, 1))
+        
+        out_age = self.branch_age(ap) # out_flatten -> out
+        out_gender = self.branch_gender(ap) # out_flatten -> out
+        out_weight = self.branch_weight(ap) # out_flatten -> out
+        out_hight = self.branch_hight(ap) # out_flatten -> out
+        
+        return  out_segment, out_age, out_gender, out_weight, out_hight
