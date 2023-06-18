@@ -48,11 +48,11 @@ def make_dataset(debug="False"):
     tf = None
     train_transform, val_transform = get_transform()
     if args.transform=='True':
-        train_dataset = XRayDataset_gray(is_train=True, transforms=train_transform)
-        valid_dataset = XRayDataset_gray(is_train=False, transforms=val_transform)
+        train_dataset = XRayDataset(is_train=True, transforms=train_transform, dataclean=args.dataclean)
+        valid_dataset = XRayDataset(is_train=False, transforms=val_transform, dataclean=args.dataclean)
     else:
-        train_dataset = XRayDataset_gray(is_train=True, transforms=tf)
-        valid_dataset = XRayDataset_gray(is_train=False, transforms=tf)
+        train_dataset = XRayDataset(is_train=True, transforms=tf, dataclean=args.dataclean)
+        valid_dataset = XRayDataset(is_train=False, transforms=tf, dataclean=args.dataclean)
     if debug=="True":
         train_subset_size = int(len(train_dataset) * 0.1)
 
@@ -95,7 +95,7 @@ def dice_coef(y_true, y_pred):
 
 def save_model(model, args):
     
-    output_path = os.path.join(args.save_dir, f"{args.model}_{args.encoder}_{args.loss}_{args.epochs}.pt")    #아래의 wandb쪽의 name과 동시 수정할것
+    output_path = os.path.join(args.save_dir, f"grey_{args.model}_{args.encoder}_{args.loss}_{args.epochs}.pt")    #아래의 wandb쪽의 name과 동시 수정할것
     torch.save(model, output_path)
 
 def set_seed(seed):
@@ -114,7 +114,7 @@ def wandb_config(args):
                     'max_epoch':args.epochs},
             project='Segmentation',
             entity='aivengers_seg',
-            name=f'{args.model}_{args.encoder}_{args.loss}_{args.epochs}'
+            name=f'grey_{args.model}_{args.encoder}_{args.loss}_{args.epochs}'
             )
 
 def validation(epoch, model, data_loader, criterion, thr=0.5):
@@ -154,12 +154,6 @@ def validation(epoch, model, data_loader, criterion, thr=0.5):
     dices_per_class = torch.mean(dices, 0)
     row = np.concatenate((np.array([epoch]), np.array(dices_per_class)))
     my_table.add_data(*row)
-    # dice_str = [
-    #     f"{c:<12}: {d.item():.4f}"
-    #     for c, d in zip(CLASSES, dices_per_class)
-    # ]
-    # dice_str = "\n".join(dice_str)
-    # print(dice_str)
     avg_dice = torch.mean(dices_per_class).item()
     
     return avg_dice
@@ -255,7 +249,7 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--seed", default=21, help="random seed (default: 21)")
+    parser.add_argument("--seed", type=int, default=0, help="random seed (default: 0), select one of [0,1,2,3,4]")
     parser.add_argument("--loss", type=str, default="bce_loss")
     parser.add_argument("--model", type=str, default="FPN_gray")
     parser.add_argument("--epochs", type=int, default=100)
@@ -263,10 +257,11 @@ if __name__ == '__main__':
     parser.add_argument("--wandb", type=str, default="True")
     parser.add_argument("--encoder", type=str, default="resnet101")
     parser.add_argument("--save_dir", type=str, default="/opt/ml/input/weights/")
-    parser.add_argument("--model_path", type=str, default="/opt/ml/input/weights/albumentation/FPN_densenet161_150.pt")
+    parser.add_argument("--model_path", type=str, default="/opt/ml/weights/fcn_resnet101_best_model.pt")
     parser.add_argument("--debug", type=str, default="False")
     parser.add_argument("--transform",type=str, default="False")
-
+    # parser.add_argument("--acc_steps", type=str, default="False") # acc_steps 기능 추가 필요
+    parser.add_argument("--dataclean",type=str, default="True")
 
     args = parser.parse_args()
     if args.model == 'Pretrained_torchvision' or 'Pretrained_smp':
@@ -274,5 +269,12 @@ if __name__ == '__main__':
     else:
         args.save_dir = os.path.join(args.save_dir, args.model)
 
+    start = time.time()
+    print(f"Model save dir: {args.save_dir}")
     print(args)
     main(args)
+    end = time.time()
+    sec = (end - start)
+    result = datetime.timedelta(seconds=sec)
+    result_list = str(datetime.timedelta(seconds=sec)).split(".")
+    print(result_list[0])
