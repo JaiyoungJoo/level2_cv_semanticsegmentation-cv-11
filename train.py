@@ -98,7 +98,7 @@ def dice_coef(y_true, y_pred):
 
 def save_model(model, args):
     
-    output_path = os.path.join(args.save_dir, f"{args.model}_{args.encoder}_{args.loss}_{args.epochs}_step_1_acctest.pt")    #아래의 wandb쪽의 name과 동시 수정할것
+    output_path = os.path.join(args.save_dir, f"{args.model}_{args.encoder}_{args.loss}_{args.epochs}_dataclean3_noacc.pt")    #아래의 wandb쪽의 name과 동시 수정할것
     torch.save(model, output_path)
 
 def set_seed(seed):
@@ -117,7 +117,7 @@ def wandb_config(args):
                     'max_epoch':args.epochs},
             project='Segmentation',
             entity='aivengers_seg',
-            name=f'{args.model}_{args.encoder}_{args.loss}_{args.epochs}_step_1_acctest'
+            name=f'{args.model}_{args.encoder}_{args.loss}_{args.epochs}_dataclean3_noacc'
             )
 
 def validation(epoch, model, data_loader, criterion, thr=0.5):
@@ -195,20 +195,26 @@ def train(model, data_loader, val_loader, criterion, optimizer, args):
             
             # inference
             outputs = model(images)
-            
             # loss 계산
             loss = criterion(outputs, masks)
-            loss = loss / args.acc_steps # 경사를 경사 누적 스텝 수로 나눔
-            loss.backward()
-            step_count += 1
-            if step_count % args.acc_steps == 0:
+            if args.acc_steps == 'False':
+                optimizer.zero_grad()
+                loss.backward()
                 optimizer.step()
-                optimizer.zero_grad()
-                step_count = 0
-            # 경사 업데이트 없이 스텝을 끝마치기 전에 경사 초기화
-            if step_count != 0 and (step_count % args.acc_steps) != 0:
-                optimizer.zero_grad()
-            
+
+            else:
+                args.acc_steps = int(args.acc_steps)
+                loss = loss / args.acc_steps # 경사를 경사 누적 스텝 수로 나눔
+                loss.backward()
+                step_count += 1
+                if step_count % args.acc_steps == 0:
+                    optimizer.step()
+                    optimizer.zero_grad()
+                    step_count = 0
+                # 경사 업데이트 없이 스텝을 끝마치기 전에 경사 초기화
+                if step_count != 0 and (step_count % args.acc_steps) != 0:
+                    optimizer.zero_grad()
+
             # step 주기에 따른 loss 출력
             if (step + 1) % 25 == 0:
                 print(
@@ -275,8 +281,8 @@ if __name__ == '__main__':
     parser.add_argument("--model_path", type=str, default="/opt/ml/input/weights/albumentation/FPN_densenet161_150.pt")
     parser.add_argument("--debug", type=str, default="False")
     parser.add_argument("--transform",type=str, default="False")
-    parser.add_argument("--acc_steps", type=int, default="1")
-    parser.add_argument("--dataclean",type=str, default="False")
+    parser.add_argument("--acc_steps", type=str, default="False")
+    parser.add_argument("--dataclean",type=str, default="True")
 
     args = parser.parse_args()
     if args.model == 'Pretrained_torchvision' or 'Pretrained_smp':
