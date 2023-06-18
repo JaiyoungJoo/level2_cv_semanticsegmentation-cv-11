@@ -83,13 +83,13 @@ class MAnet(nn.Module):
       
 # hrnet
 class  HRNet(nn.Module):
-    def __init__(self, name='hrnet48',pretrained ="/opt/ml/weights/MultiModalV2/hrnetv2_w48_imagenet_pretrained.pth",num_classes=29, encoder = 'HR'):
+    def __init__(self, name='hrnet48',pretrained ="/opt/ml/input/weights/hrnetv2_w48_imagenet_pretrained.pth",num_classes=29, encoder = 'HR'):
         super().__init__()
         self.net = hrnet.get_ocr_model(name = name, pretrained=pretrained)
     
     def forward(self, x):
         out = self.net(x)
-        out = F.interpolate(out, size=(512, 512), mode="bilinear")
+        out = F.interpolate(out, size=(1024, 1024), mode="bilinear")
         return out
     
 # pretrained weight
