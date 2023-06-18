@@ -61,5 +61,5 @@ def comb_loss(pred, target):
     bce = bce_loss(pred, target)
     dice = smp_dice_loss(pred, target)
     jaccard = smp_jaccard_loss(pred, target)
-    loss = (0.33*bce) + (0.33*dice) + (0.33*jaccard)
+    loss = (0.1*bce) + (0.6*dice) + (0.3*jaccard)
     return loss
