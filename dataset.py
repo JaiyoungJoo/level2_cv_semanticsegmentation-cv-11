@@ -581,9 +581,15 @@ class XRayInferenceDataset_gray(Dataset):
         return image, image_name
 
 class XRayDataset_Multi(Dataset):
-    def __init__(self, is_train=True, transforms=None, seed = 21):
+    def __init__(self, is_train=True, transforms=None, seed = 21,  dataclean = None):
         pngs, jsons = check_size_of_dataset(IMAGE_ROOT, LABEL_ROOT)
-
+        self.dataclean = dataclean
+        if self.dataclean:
+            print("#########################################################")
+            print("Data Cleaning....")
+            print("#########################################################")
+            pngs = sorted(list(set(pngs) - set(ABNORMAL_PNGS)))
+            jsons = sorted(list(set(jsons) - set(ABNORMAL_JSONS)))
         _filenames = np.array(pngs)
         _labelnames = np.array(jsons)
         
