@@ -69,10 +69,7 @@ def test(model, data_loader, thr=0.5,tta_enabled=False):
 
         for step, (images, image_names) in tqdm(enumerate(data_loader), total=len(data_loader)):
             images = images.cuda()
-            # images = Image.open(images)
-            # images = images.unsqueeze(0)
 
-            # outputs = model(images)['out']
             if tta_enabled:
                 tta_model = tta.SegmentationTTAWrapper(model, tta_transforms)
                 outputs = tta_model(images)
@@ -95,9 +92,6 @@ def test(model, data_loader, thr=0.5,tta_enabled=False):
 def main():
     model = torch.load(MODEL_ROOT)
     tf = A.Resize(512, 512)
-    tf1= A.Compose([
-         A.CenterCrop(1900,1500),
-         A.Resize(512, 512)])
 
     test_dataset = dataset.XRayInferenceDataset(transforms=tf)
 
@@ -139,7 +133,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=2, help='input batch size for validing (default: 2)')
     # Container environment
     parser.add_argument('--data_path', type=str, default='/opt/ml/input/data/test/DCM')
-    parser.add_argument('--model_path', type=str, default='/opt/ml/input/weights/normalize_FPN_densenet161_bce_loss_100.pt')
+    parser.add_argument('--model_path', type=str, default='/opt/ml/weights/fcn_resnet101_best_model.pt')
     parser.add_argument('--output_path', type=str, default='/opt/ml/input/result')
     parser.add_argument('--tta', type=str, default='False')
     
