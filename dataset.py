@@ -15,6 +15,7 @@ IMAGE_ROOT = "/opt/ml/input/data/train/DCM/"
 LABEL_ROOT = "/opt/ml/input/data/train/outputs_json/"
 TEST_ROOT = "/opt/ml/input/data/test/DCM/"
 
+# class
 CLASSES = [
     'finger-1', 'finger-2', 'finger-3', 'finger-4', 'finger-5',
     'finger-6', 'finger-7', 'finger-8', 'finger-9', 'finger-10',
@@ -27,6 +28,7 @@ CLASSES = [
 CLASS2IND = {v: i for i, v in enumerate(CLASSES)}
 IND2CLASS = {v: k for k, v in CLASS2IND.items()}
 
+# abnormal data
 ABNORMAL_PNGS = [
     'ID073/image1661736368856.png', 'ID073/image1661736410568.png',
     'ID124/image1661910068358.png', 'ID124/image1661910096458.png',
@@ -52,6 +54,7 @@ ABNORMAL_JSONS = [
     'ID543/image1667266674012.json', 'ID543/image1667266700981.json',
 ]
 
+# get dataset root & check size
 def check_size_of_dataset(IMAGE_ROOT, LABEL_ROOT):
     pngs = {
         os.path.relpath(os.path.join(root, fname), start=IMAGE_ROOT) # relpath : 상대 경로로 변경
@@ -81,6 +84,7 @@ def check_size_of_dataset(IMAGE_ROOT, LABEL_ROOT):
     else:
         return pngs
 
+# transformer function
 def equalize_and_remove_black(image, **kwargs):
     # 평활화 적용
     image = cv2.convertScaleAbs(image)
@@ -111,6 +115,7 @@ def clahe2(image, **kwargs):
     transformed_image = transform(image=image)["image"]
     return transformed_image
 
+# final transformer
 def get_transform():
     train_transform = [
         A.Resize(1024,1024),
@@ -124,6 +129,7 @@ def get_transform():
 
     return A.Compose(train_transform), A.Compose(val_transform)
 
+# Dataset Class
 class XRayInferenceDataset(Dataset):
     def __init__(self, transforms=None, stream=False):
         pngs = check_size_of_dataset(TEST_ROOT, False)
@@ -140,8 +146,6 @@ class XRayInferenceDataset(Dataset):
         return len(self.filenames)
     
     def __getitem__(self, item):
-        # image_name = self.filenames[item]
-        # image_path = os.path.join(TEST_ROOT, image_name)
         if self.stream:
             image_name = 'img.jpg'
             image_path = '/opt/ml/level2_cv_semanticsegmentation-cv-11/' + image_name
@@ -207,18 +211,8 @@ class XRayDataset(Dataset):
                 # skip i > 0
                 break
 
-        # self.dataclean = dataclean
         self.filenames = filenames
-        # if self.dataclean:
-        #     self.filenames = list(set(self.filenames) - set(ABNORMAL_PNGS))
         self.labelnames = labelnames
-        # if self.dataclean:
-        #     self.labelnames = list(set(self.labelnames) - set(ABNORMAL_JSONS))
-        #     print("#########################################################")
-        #     print("Data Cleaning....")
-        #     print('filenames', len(self.filenames))
-        #     print('labelnames', len(self.labelnames))
-        #     print("#########################################################")
         self.is_train = is_train
         self.transforms = transforms
    
@@ -256,16 +250,9 @@ class XRayDataset(Dataset):
             label[..., class_ind] = class_label
         
         if self.transforms is not None:
-            # if any(isinstance(t, A.CLAHE) for t in self.transforms.transforms):
-            #     image = image.astype(np.uint8)  # 데이터 타입을 uint8로 변환
             inputs = {"image": image, "mask": label} if self.is_train else {"image": image}
             result = self.transforms(**inputs)
-            
-            # if any(isinstance(t, A.CLAHE) for t in self.transforms.transforms):
-            # image = result["image"].astype(np.float32)
-            # else:
             image = result["image"]
-
             label = result["mask"] if self.is_train else label
 
         # to tenser will be done later
@@ -593,12 +580,6 @@ class XRayInferenceDataset_gray(Dataset):
             
         return image, image_name
 
-
-
-
-
-
-
 class XRayDataset_Multi(Dataset):
     def __init__(self, is_train=True, transforms=None, seed = 21):
         pngs, jsons = check_size_of_dataset(IMAGE_ROOT, LABEL_ROOT)
@@ -642,6 +623,8 @@ class XRayDataset_Multi(Dataset):
         self.is_train = is_train
         self.transforms = transforms
         self.meta = pd.read_excel('/opt/ml/input/data/meta_data.xlsx')
+
+        # Structured Data Nomalization
         self.age_max = 69
         self.age_min = 19
         self.age_denominator = self.age_max - self.age_min
@@ -709,8 +692,6 @@ class XRayDataset_Multi(Dataset):
         hight = torch.tensor([(int(info['키(신장)'].iloc[0])-self.hight_min)/self.hight_denominator]).float()
         return image, label, age, gender, weight, hight
     
-
-
 class XRayInferenceDataset_Multi(Dataset):
     def __init__(self, transforms=None):
         pngs = check_size_of_dataset(TEST_ROOT, False)
@@ -720,6 +701,8 @@ class XRayInferenceDataset_Multi(Dataset):
         
         self.filenames = _filenames
         self.transforms = transforms
+        
+        # Structured Data Nomalization
         self.meta = pd.read_excel('/opt/ml/input/data/meta_data.xlsx')
         self.age_max = 69
         self.age_min = 19
