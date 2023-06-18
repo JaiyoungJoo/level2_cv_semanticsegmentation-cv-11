@@ -27,6 +27,31 @@ CLASSES = [
 CLASS2IND = {v: i for i, v in enumerate(CLASSES)}
 IND2CLASS = {v: k for k, v in CLASS2IND.items()}
 
+ABNORMAL_PNGS = [
+    'ID073/image1661736368856.png', 'ID073/image1661736410568.png',
+    'ID124/image1661910068358.png', 'ID124/image1661910096458.png',
+    'ID288/image1664156956152.png', 'ID288/image1664156981600.png',
+    'ID363/image1664935962797.png', 'ID375/image1665452681174.png',
+    'ID387/image1665536734529.png', 'ID387/image1665536751182.png',
+    'ID430/image1666059865789.png', 'ID430/image1666059889440.png',
+    'ID487/image1666661955150.png', 'ID506/image1666747096906.png',
+    'ID519/image1666749288019.png', 'ID519/image1666749315607.png',
+    'ID523/image1667178735444.png', 'ID523/image1667178762956.png',
+    'ID543/image1667266674012.png', 'ID543/image1667266700981.png',
+]
+ABNORMAL_JSONS = [
+    'ID073/image1661736368856.json', 'ID073/image1661736410568.json',
+    'ID124/image1661910068358.json', 'ID124/image1661910096458.json',
+    'ID288/image1664156956152.json', 'ID288/image1664156981600.json',
+    'ID363/image1664935962797.json', 'ID375/image1665452681174.json',
+    'ID387/image1665536734529.json', 'ID387/image1665536751182.json',
+    'ID430/image1666059865789.json', 'ID430/image1666059889440.json',
+    'ID487/image1666661955150.json', 'ID506/image1666747096906.json',
+    'ID519/image1666749288019.json', 'ID519/image1666749315607.json',
+    'ID523/image1667178735444.json', 'ID523/image1667178762956.json',
+    'ID543/image1667266674012.json', 'ID543/image1667266700981.json',
+]
+
 def check_size_of_dataset(IMAGE_ROOT, LABEL_ROOT):
     pngs = {
         os.path.relpath(os.path.join(root, fname), start=IMAGE_ROOT) # relpath : 상대 경로로 변경
@@ -102,22 +127,29 @@ def get_transform():
     return A.Compose(train_transform), A.Compose(val_transform)
 
 class XRayInferenceDataset(Dataset):
-    def __init__(self, transforms=None):
+    def __init__(self, transforms=None, stream=False):
         pngs = check_size_of_dataset(TEST_ROOT, False)
-        
+        if stream:
+            pngs = 'img.jpg'
         _filenames = pngs
         _filenames = np.array(sorted(_filenames))
         
         self.filenames = _filenames
         self.transforms = transforms
+        self.stream = stream
     
     def __len__(self):
         return len(self.filenames)
     
     def __getitem__(self, item):
-        image_name = self.filenames[item]
-        image_path = os.path.join(TEST_ROOT, image_name)
-        
+        # image_name = self.filenames[item]
+        # image_path = os.path.join(TEST_ROOT, image_name)
+        if self.stream:
+            image_name = 'img.jpg'
+            image_path = '/opt/ml/level2_cv_semanticsegmentation-cv-11/' + image_name
+        else: 
+            image_name = self.filenames[item]
+            image_path = os.path.join(TEST_ROOT, image_name)
         image = cv2.imread(image_path)
         image = image / 255.
         
@@ -134,9 +166,15 @@ class XRayInferenceDataset(Dataset):
         return image, image_name
 
 class XRayDataset(Dataset):
-    def __init__(self, is_train=True, transforms=None, seed = 21):
+    def __init__(self, is_train=True, transforms=None, seed = 21, dataclean = None):
         pngs, jsons = check_size_of_dataset(IMAGE_ROOT, LABEL_ROOT)
-
+        self.dataclean = dataclean
+        if self.dataclean:
+            print("#########################################################")
+            print("Data Cleaning....")
+            print("#########################################################")
+            pngs = sorted(list(set(pngs) - set(ABNORMAL_PNGS)))
+            jsons = sorted(list(set(jsons) - set(ABNORMAL_JSONS)))
         _filenames = np.array(pngs)
         _labelnames = np.array(jsons)
         
@@ -170,21 +208,29 @@ class XRayDataset(Dataset):
                 
                 # skip i > 0
                 break
-        
+
+        # self.dataclean = dataclean
         self.filenames = filenames
+        # if self.dataclean:
+        #     self.filenames = list(set(self.filenames) - set(ABNORMAL_PNGS))
         self.labelnames = labelnames
+        # if self.dataclean:
+        #     self.labelnames = list(set(self.labelnames) - set(ABNORMAL_JSONS))
+        #     print("#########################################################")
+        #     print("Data Cleaning....")
+        #     print('filenames', len(self.filenames))
+        #     print('labelnames', len(self.labelnames))
+        #     print("#########################################################")
         self.is_train = is_train
         self.transforms = transforms
-       
-    
+   
     def __len__(self):
         return len(self.filenames)
     
     def __getitem__(self, item):
         image_name = self.filenames[item]
         image_path = os.path.join(IMAGE_ROOT, image_name)
-        
-        
+
         image = cv2.imread(image_path)
         image = image / 255.
         

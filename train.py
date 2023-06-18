@@ -23,6 +23,10 @@ from dataset import XRayDataset
 from dataset import get_transform
 ssl._create_default_https_context = ssl._create_unverified_context
 
+# for time check
+import time
+from pytz import timezone
+
 # exp setting
 BATCH_SIZE = 8
 LR = 1e-4
@@ -47,11 +51,11 @@ def make_dataset(debug="False"):
     tf = A.Resize(512, 512)
     train_transform, val_transform = get_transform()
     if args.transform=='True':
-        train_dataset = XRayDataset(is_train=True, transforms=train_transform)
-        valid_dataset = XRayDataset(is_train=False, transforms=val_transform)
+        train_dataset = XRayDataset(is_train=True, transforms=train_transform, dataclean=args.dataclean)
+        valid_dataset = XRayDataset(is_train=False, transforms=val_transform, dataclean=args.dataclean)
     else:
-        train_dataset = XRayDataset(is_train=True, transforms=tf)
-        valid_dataset = XRayDataset(is_train=False, transforms=tf)
+        train_dataset = XRayDataset(is_train=True, transforms=tf, dataclean=args.dataclean)
+        valid_dataset = XRayDataset(is_train=False, transforms=tf, dataclean=args.dataclean)
     if debug=="True":
         train_subset_size = int(len(train_dataset) * 0.1)
 
@@ -183,7 +187,7 @@ def train(model, data_loader, val_loader, criterion, optimizer, args):
 
 
         model.train()
-
+        step_count = 0
         for step, (images, masks) in enumerate(data_loader):            
             # gpu 연산을 위해 device 할당
             images, masks = images.cuda(), masks.cuda()
@@ -191,17 +195,30 @@ def train(model, data_loader, val_loader, criterion, optimizer, args):
             
             # inference
             outputs = model(images)
-            
             # loss 계산
             loss = criterion(outputs, masks)
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            
+            if args.acc_steps == 'False':
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+
+            else:
+                args.acc_steps = int(args.acc_steps)
+                loss = loss / args.acc_steps # 경사를 경사 누적 스텝 수로 나눔
+                loss.backward()
+                step_count += 1
+                if step_count % args.acc_steps == 0:
+                    optimizer.step()
+                    optimizer.zero_grad()
+                    step_count = 0
+                # 경사 업데이트 없이 스텝을 끝마치기 전에 경사 초기화
+                if step_count != 0 and (step_count % args.acc_steps) != 0:
+                    optimizer.zero_grad()
+
             # step 주기에 따른 loss 출력
             if (step + 1) % 25 == 0:
                 print(
-                    f'{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")} | '
+                    f'{datetime.datetime.now(timezone("Asia/Seoul")).strftime("%Y-%m-%d %H:%M:%S")} | '
                     f'Epoch [{epoch+1}/{args.epochs}], '
                     f'Step [{step+1}/{len(data_loader)}], '
                     f'Loss: {round(loss.item(),4)}'
@@ -256,15 +273,16 @@ if __name__ == '__main__':
     parser.add_argument("--seed", default=0, help="random seed (default: 0), select one of [0,1,2,3,4]")
     parser.add_argument("--loss", type=str, default="bce_loss")
     parser.add_argument("--model", type=str, default="FCN")
-    parser.add_argument("--epochs", type=int, default=100)
-    parser.add_argument("--val_every", type=int, default=5)
+    parser.add_argument("--epochs", type=int, default=200)
+    parser.add_argument("--val_every", type=int, default=1)
     parser.add_argument("--wandb", type=str, default="True")
-    parser.add_argument("--encoder", type=str, default="resnet101")
+    parser.add_argument("--encoder", type=str, default="resnet50")
     parser.add_argument("--save_dir", type=str, default="/opt/ml/input/weights/")
     parser.add_argument("--model_path", type=str, default="/opt/ml/input/weights/albumentation/FPN_densenet161_150.pt")
     parser.add_argument("--debug", type=str, default="False")
     parser.add_argument("--transform",type=str, default="False")
-
+    parser.add_argument("--acc_steps", type=str, default="False")
+    parser.add_argument("--dataclean",type=str, default="True")
 
     args = parser.parse_args()
     if args.model == 'Pretrained_torchvision' or args.model == 'Pretrained_smp':
@@ -272,6 +290,12 @@ if __name__ == '__main__':
     else:
         args.save_dir = os.path.join(args.save_dir, args.model)
 
+    start = time.time()
     print(f"Model save dir: {args.save_dir}")
     print(args)
     main(args)
+    end = time.time()
+    sec = (end - start)
+    result = datetime.timedelta(seconds=sec)
+    result_list = str(datetime.timedelta(seconds=sec)).split(".")
+    print(result_list[0])
