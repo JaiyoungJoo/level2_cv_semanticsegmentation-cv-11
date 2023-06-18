@@ -127,22 +127,29 @@ def get_transform():
     return A.Compose(train_transform), A.Compose(val_transform)
 
 class XRayInferenceDataset(Dataset):
-    def __init__(self, transforms=None):
+    def __init__(self, transforms=None, stream=False):
         pngs = check_size_of_dataset(TEST_ROOT, False)
-        
+        if stream:
+            pngs = 'img.jpg'
         _filenames = pngs
         _filenames = np.array(sorted(_filenames))
         
         self.filenames = _filenames
         self.transforms = transforms
+        self.stream = stream
     
     def __len__(self):
         return len(self.filenames)
     
     def __getitem__(self, item):
-        image_name = self.filenames[item]
-        image_path = os.path.join(TEST_ROOT, image_name)
-        
+        # image_name = self.filenames[item]
+        # image_path = os.path.join(TEST_ROOT, image_name)
+        if self.stream:
+            image_name = 'img.jpg'
+            image_path = '/opt/ml/level2_cv_semanticsegmentation-cv-11/' + image_name
+        else: 
+            image_name = self.filenames[item]
+            image_path = os.path.join(TEST_ROOT, image_name)
         image = cv2.imread(image_path)
         image = image / 255.
         
@@ -161,7 +168,13 @@ class XRayInferenceDataset(Dataset):
 class XRayDataset(Dataset):
     def __init__(self, is_train=True, transforms=None, seed = 21, dataclean = None):
         pngs, jsons = check_size_of_dataset(IMAGE_ROOT, LABEL_ROOT)
-
+        self.dataclean = dataclean
+        if self.dataclean:
+            print("#########################################################")
+            print("Data Cleaning....")
+            print("#########################################################")
+            pngs = sorted(list(set(pngs) - set(ABNORMAL_PNGS)))
+            jsons = sorted(list(set(jsons) - set(ABNORMAL_JSONS)))
         _filenames = np.array(pngs)
         _labelnames = np.array(jsons)
         
@@ -196,18 +209,18 @@ class XRayDataset(Dataset):
                 # skip i > 0
                 break
 
-        self.dataclean = dataclean
+        # self.dataclean = dataclean
         self.filenames = filenames
-        if self.dataclean:
-            self.filenames = list(set(self.filenames) - set(ABNORMAL_PNGS))
+        # if self.dataclean:
+        #     self.filenames = list(set(self.filenames) - set(ABNORMAL_PNGS))
         self.labelnames = labelnames
-        if self.dataclean:
-            self.labelnames = list(set(self.labelnames) - set(ABNORMAL_JSONS))
-            print("#########################################################")
-            print("Data Cleaning....")
-            print('filenames', len(self.filenames))
-            print('labelnames', len(self.labelnames))
-            print("#########################################################")
+        # if self.dataclean:
+        #     self.labelnames = list(set(self.labelnames) - set(ABNORMAL_JSONS))
+        #     print("#########################################################")
+        #     print("Data Cleaning....")
+        #     print('filenames', len(self.filenames))
+        #     print('labelnames', len(self.labelnames))
+        #     print("#########################################################")
         self.is_train = is_train
         self.transforms = transforms
    
