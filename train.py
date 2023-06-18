@@ -97,8 +97,7 @@ def dice_coef(y_true, y_pred):
     return (2. * intersection + eps) / (torch.sum(y_true_f, -1) + torch.sum(y_pred_f, -1) + eps)
 
 def save_model(model, args):
-    
-    output_path = os.path.join(args.save_dir, f"{args.model}_{args.encoder}_{args.loss}_{args.epochs}_seed={args.seed}.pt")    #아래의 wandb쪽의 name과 동시 수정할것
+    output_path = os.path.join(args.save_dir, f"{args.model}_{args.encoder}_{args.loss}_tf={args.transform}_cln={args.dataclean}_e={args.epochs}_sd={args.seed}.pt")    #아래의 wandb쪽의 name과 동시 수정할것
     torch.save(model, output_path)
 
 def set_seed(seed):
@@ -117,7 +116,7 @@ def wandb_config(args):
                     'max_epoch':args.epochs},
             project='Segmentation',
             entity='aivengers_seg',
-            name=f'{args.model}_{args.encoder}_{args.loss}_{args.epochs}_seed={args.seed}'
+            name=f'{args.model}_{args.encoder}_{args.loss}_tf={args.transform}_cln={args.dataclean}_e={args.epochs}_sd={args.seed}'
             )
 
 def validation(epoch, model, data_loader, criterion, thr=0.5):
@@ -273,14 +272,14 @@ if __name__ == '__main__':
     parser.add_argument("--seed", type=int, default=0, help="random seed (default: 0), select one of [0,1,2,3,4]")
     parser.add_argument("--loss", type=str, default="comb_loss")
     parser.add_argument("--model", type=str, default="FCN")
-    parser.add_argument("--epochs", type=int, default=200)
+    parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--val_every", type=int, default=1)
     parser.add_argument("--wandb", type=str, default="True")
-    parser.add_argument("--encoder", type=str, default="resnet50")
+    parser.add_argument("--encoder", type=str, default="resnet101")
     parser.add_argument("--save_dir", type=str, default="/opt/ml/input/weights/")
-    parser.add_argument("--model_path", type=str, default="/opt/ml/input/weights/albumentation/FPN_densenet161_150.pt")
+    parser.add_argument("--model_path", type=str, default="/opt/ml/weights/fcn_resnet101_best_model.pt")
     parser.add_argument("--debug", type=str, default="False")
-    parser.add_argument("--transform",type=str, default="False")
+    parser.add_argument("--transform",type=str, default="True")
     parser.add_argument("--acc_steps", type=str, default="False")
     parser.add_argument("--dataclean",type=str, default="True")
 
