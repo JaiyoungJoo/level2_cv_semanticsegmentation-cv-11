@@ -28,7 +28,6 @@ import time
 from pytz import timezone
 
 # exp setting
-BATCH_SIZE = 8
 LR = 1e-4
 CLASSES = [
     'finger-1', 'finger-2', 'finger-3', 'finger-4', 'finger-5',
@@ -70,14 +69,14 @@ def make_dataset(debug="False"):
         valid_subset_indices = torch.randperm(len(valid_dataset))[:valid_subset_size]
         valid_dataset = Subset(valid_dataset, valid_subset_indices)
         
+
     train_loader = DataLoader(
         dataset=train_dataset, 
-        batch_size=BATCH_SIZE,
+        batch_size=args.train_batch,
         shuffle=True,
-        num_workers=8,
+        num_workers=args.train_workers,
         drop_last=True,
     )
-
     valid_loader = DataLoader(
         dataset=valid_dataset, 
         batch_size=2,
@@ -110,7 +109,7 @@ def set_seed(seed):
     random.seed(seed)
 
 def wandb_config(args):
-    wandb.init(config={'batch_size':BATCH_SIZE,
+    wandb.init(config={'batch_size':args.train_batch,
                     'learning_rate':LR,                 #차차 args.~~로 update할 것
                     'seed':args.seed,
                     'max_epoch':args.epochs},
@@ -274,6 +273,8 @@ if __name__ == '__main__':
     parser.add_argument("--model", type=str, default="FCN")
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--val_every", type=int, default=1)
+    parser.add_argument("--train_batch", type=int, default=4, help = 'image size 1024 - batch 4 이하, 512 - 8이하')
+    parser.add_argument("--train_workers", type=int, default=4, help = 'default = 4 (==batch_size)')
     parser.add_argument("--wandb", type=str, default="True")
     parser.add_argument("--encoder", type=str, default="resnet101")
     parser.add_argument("--save_dir", type=str, default="/opt/ml/input/weights/")
