@@ -39,7 +39,27 @@ def smp_dice_loss(pred, target):
 
 def smp_focal_loss(pred, target):
     loss_function = getattr(losses, "FocalLoss")(mode="multilabel")
+    loss = loss_function(pred, target)
+    return loss
+
+def tversky_loss(pred, target):
+    loss_function = getattr(losses, "TverskyLoss")(mode="multilabel", alpha=0.6, beta=0.4)
+    loss = loss_function(pred, target)
+    return loss
+    
 def mse_loss(pred, target):
     loss_function = nn.MSELoss()
     loss = loss_function(pred, target)
+    return loss
+
+def smp_jaccard_loss(pred, target):
+    loss_function = getattr(losses, "JaccardLoss")(mode="multilabel")
+    loss = loss_function(pred, target)
+    return loss
+
+def comb_loss(pred, target):
+    bce = bce_loss(pred, target)
+    dice = smp_dice_loss(pred, target)
+    jaccard = smp_jaccard_loss(pred, target)
+    loss = (0.33*bce) + (0.33*dice) + (0.33*jaccard)
     return loss
