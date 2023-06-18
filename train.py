@@ -271,7 +271,7 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, default=0, help="random seed (default: 0), select one of [0,1,2,3,4]")
-    parser.add_argument("--loss", type=str, default="bce_loss")
+    parser.add_argument("--loss", type=str, default="comb_loss")
     parser.add_argument("--model", type=str, default="FCN")
     parser.add_argument("--epochs", type=int, default=200)
     parser.add_argument("--val_every", type=int, default=1)
