@@ -113,15 +113,13 @@ def clahe2(image, **kwargs):
 
 def get_transform():
     train_transform = [
-        # A.Lambda(image=clahe2),
-        A.RandomContrast(limit=[0,0.5], p=1),
-        # A.CenterCrop(1900,1500),
-        # A.Lambda(image=equalize_and_remove_black),
-        A.Resize(512, 512),
-        A.Rotate(limit=45)
+        A.Resize(1024,1024),
+        A.ElasticTransform(p=0.5, alpha=300, sigma=20, alpha_affine=50),
+        A.Rotate(limit=45),
+        A.RandomContrast(limit=[0,0.5],p=1)
     ]
     val_transform = [
-        A.Resize(512, 512),
+        A.Resize(1024,1024),
     ]
 
     return A.Compose(train_transform), A.Compose(val_transform)
