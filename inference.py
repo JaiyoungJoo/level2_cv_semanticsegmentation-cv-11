@@ -13,6 +13,7 @@ from torch.utils.data import Dataset, DataLoader
 
 import argparse
 import dataset
+import ttach as tta
 
 # csv 저장명 중복 확인
 def exist_csv(filename):
@@ -56,9 +57,8 @@ def decode_rle_to_mask(rle, height, width):
         img[lo:hi] = 1
     
     return img.reshape(height, width)
-
-
-def test(model, data_loader, thr=0.5):
+    
+def test(model, data_loader, thr=0.5,tta_enabled=False):
     model = model.cuda()
     model.eval()
 
@@ -73,7 +73,11 @@ def test(model, data_loader, thr=0.5):
             # images = images.unsqueeze(0)
 
             # outputs = model(images)['out']
-            outputs = model(images)
+            if tta_enabled:
+                tta_model = tta.SegmentationTTAWrapper(model, tta_transforms)
+                outputs = tta_model(images)
+            else:
+                outputs = model(images)
             
             # restore original size
             outputs = F.interpolate(outputs, size=(2048, 2048), mode="bilinear")
@@ -90,13 +94,8 @@ def test(model, data_loader, thr=0.5):
 
 def main():
     model = torch.load(MODEL_ROOT)
-
-    tf = A.Resize(512, 512)
-    tf1= A.Compose([
-         A.CenterCrop(1900,1500),
-         A.Resize(512, 512)])
-
-    test_dataset = dataset.XRayInferenceDataset(transforms=tf1)
+    tf = A.Resize(512,512)
+    test_dataset = dataset.XRayInferenceDataset(transforms=tf)
 
     test_loader = DataLoader(
         dataset=test_dataset, 
@@ -105,9 +104,16 @@ def main():
         num_workers=2,
         drop_last=False
     )
-
-    rles, filename_and_class = test(model, test_loader)
-
+    tta_transforms = tta.Compose([
+        tta.Resize((512,512)),
+        tta.HorizontalFlip()
+    ])
+    
+    if args.tta=='True':
+        rles, filename_and_class = test(tta_model, test_loader,tta_enabled=True)
+    else:
+        rles, filename_and_class = test(model, test_loader,tta_enabled=False)
+        
     classes, filename = zip(*[x.split("_") for x in filename_and_class])
 
     image_name = [os.path.basename(f) for f in filename]
@@ -129,8 +135,9 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=2, help='input batch size for validing (default: 2)')
     # Container environment
     parser.add_argument('--data_path', type=str, default='/opt/ml/input/data/test/DCM')
-    parser.add_argument('--model_path', type=str, default='/opt/ml/input/weights/randomcontrast3_FPN_densenet161_bce_loss_100/FPN_densenet161_bce_loss_100.pt')
+    parser.add_argument('--model_path', type=str, default='/opt/ml/input/weights/normalize_FPN_densenet161_bce_loss_100.pt')
     parser.add_argument('--output_path', type=str, default='/opt/ml/input/result')
+    parser.add_argument('--tta', type=str, default='False')
     
     args = parser.parse_args()
     
@@ -159,6 +166,3 @@ if __name__ == '__main__':
     MODEL_NAME = MODEL_NAME.replace('_best_model', '')
     
     main()
-    
-
-    
