@@ -10,7 +10,7 @@ from tqdm.auto import tqdm
 import torch
 import torch.nn.functional as F
 from inference import encode_mask_to_rle
-from visualizatioin import label2rgb, decode_rle_to_mask, all_label2rgb
+from visualization import label2rgb, decode_rle_to_mask, all_label2rgb
 import inference
 import albumentations as A
 from torch.utils.data import Dataset, DataLoader
@@ -98,6 +98,7 @@ def main():
             num = ind
             checkbox_state = st.sidebar.checkbox(f"{i}", key=num, disabled=True)
             checkbox_states[num] = checkbox_state
+    seg = st.sidebar.button('seg')
 
     col1, col2 = st.columns(2)
     with col1:
@@ -111,20 +112,33 @@ def main():
             img = cv2.imread("img.jpg")
             st.image(img)
 
-            model = load_model()
-            tf = A.Resize(512, 512)
-            test_dataset = dataset.XRayInferenceDataset(transforms=tf, stream=True)
-            test_loader = DataLoader(
-                dataset=test_dataset, 
-                batch_size=1,
-                shuffle=False,
-                num_workers=2,
-                drop_last=False
-            )
-            rles, filename_and_class = test(model, test_loader)
+            # model = load_model()
+            # tf = A.Resize(512, 512)
+            # test_dataset = dataset.XRayInferenceDataset(transforms=tf, stream=True)
+            # test_loader = DataLoader(
+            #     dataset=test_dataset, 
+            #     batch_size=1,
+            #     shuffle=False,
+            #     num_workers=2,
+            #     drop_last=False
+            # )
+            # rles, filename_and_class = test(model, test_loader)
 
     with col2:
-        if upload_file is not None:
+        if upload_file is not None and seg:
+            with st.spinner('Wait for it...'):
+
+                model = load_model()
+                tf = A.Resize(512, 512)
+                test_dataset = dataset.XRayInferenceDataset(transforms=tf, stream=True)
+                test_loader = DataLoader(
+                    dataset=test_dataset, 
+                    batch_size=1,
+                    shuffle=False,
+                    num_workers=2,
+                    drop_last=False
+                )
+                rles, filename_and_class = test(model, test_loader)
                 preds = []
                 for rle in rles[:len(CLASSES)]:
                     pred = decode_rle_to_mask(rle, height=2048, width=2048)
@@ -140,6 +154,7 @@ def main():
                     array = all_label2rgb(preds)
                 pred_image = Image.fromarray(array)
                 st.image(pred_image)
+            st.success('Done!')
         
 if __name__ == '__main__':
     main()
