@@ -145,7 +145,7 @@ def validation(epoch, model, data_loader, criterion, thr=0.5):
             
             segmentation_criterion = criterion(outputs, masks)
             age_criterion =  getattr(import_module("loss"), 'mse_loss')(ages_, ages)
-            genders_criterion =  getattr(import_module("loss"), 'bce_loss')(genders_, genders)
+            genders_criterion =  getattr(import_module("loss"), 'ce_loss')(genders_, genders)
             weights_criterion =  getattr(import_module("loss"), 'mse_loss')(weights_, weights)
             heights_criterion =  getattr(import_module("loss"), 'mse_loss')(heights_, heights)
 
@@ -298,7 +298,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", default=70, help="random seed (default: 0), select one of [0,1,2,3,4]")
     parser.add_argument("--loss", type=str, default="comb_loss")
-    parser.add_argument("--model", type=str, default="MultiModalV3")
+    parser.add_argument("--model", type=str, default="MultiModalV4")
     parser.add_argument("--epochs", type=int, default=200)
     parser.add_argument("--val_every", type=int, default=1)
     parser.add_argument("--train_batch", type=int, default=3, help = 'image size 1024 - batch 4 이하, 512 - 8이하')
