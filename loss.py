@@ -8,6 +8,11 @@ def bce_loss(pred, target):
     loss = loss_function(pred, target)
     return loss
 
+def ce_loss(pred, target):
+    loss_function = nn.CrossEntropyLoss()
+    loss = loss_function(pred, target)
+    return loss
+
 
 def dice_loss(pred, target, smooth=1.):
     pred = pred.contiguous()
