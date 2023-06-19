@@ -11,7 +11,7 @@ import torch
 import torch.nn.functional as F
 from inference import encode_mask_to_rle
 from visualization import label2rgb, decode_rle_to_mask, all_label2rgb
-import inference
+
 import albumentations as A
 from torch.utils.data import Dataset, DataLoader
 import dataset
@@ -35,16 +35,52 @@ IND2CLASS = {v: k for k, v in CLASS2IND.items()}
 @st.cache_resource
 def load_model():
     model = torch.load('/opt/ml/input/weights/FPN_densenet161_150/FCN_resnet50_bce_loss_200_dataclean3_noacc_127e.pt')
+    model2 = torch.load('/opt/ml/level2_cv_semanticsegmentation-cv-11/MultiModalV3_HR_200.pt')
     model.eval()
-    return model
+    model2.eval()
+    return model, model2
 
-@st.cache(allow_output_mutation=True)
-def infer(outputs):
-    return outputs
+# @st.cache(allow_output_mutation=True)
+# def infer(outputs):
+#     return outputs
 
-def test(model, data_loader, thr=0.5):
+meta_info = {'age_min' :19 , 'age_denominator' : 69 - 19,
+    'weight_min' : 42, 'weight_denominator' : 118 - 42,
+    'height_min' : 150, 'height_denominator' : 187 - 150}
+
+# def test(model, data_loader, thr=0.5):
+#     model = model.cuda()
+#     model.eval()
+
+#     rles = []
+#     filename_and_class = []
+#     with torch.no_grad():
+#         n_class = len(CLASSES)
+
+#         for step, (images, image_names) in tqdm(enumerate(data_loader), total=len(data_loader)):
+#             images = images.cuda()
+
+#             # outputs = model(images)['out']
+#             outputs = model(images)
+ 
+#             # restore original size
+#             outputs = F.interpolate(outputs, size=(2048, 2048), mode="bilinear")
+#             outputs = torch.sigmoid(outputs)
+#             outputs = (outputs > thr).detach().cpu().numpy()
+   
+#             for output, image_name in zip(outputs, image_names):
+#                 for c, segm in enumerate(output):
+#                     rle = encode_mask_to_rle(segm)
+#                     rles.append(rle)
+#                     filename_and_class.append(f"{IND2CLASS[c]}_{image_name}")
+   
+#     return rles, filename_and_class
+
+def test(model, meta_model,data_loader, thr=0.5,tta_enabled=False):
     model = model.cuda()
+    meta_model.cuda()
     model.eval()
+    meta_model.eval()
 
     rles = []
     filename_and_class = []
@@ -53,22 +89,35 @@ def test(model, data_loader, thr=0.5):
 
         for step, (images, image_names) in tqdm(enumerate(data_loader), total=len(data_loader)):
             images = images.cuda()
-
-            # outputs = model(images)['out']
             outputs = model(images)
- 
+            meta_out = meta_model.backbone(images)
+            ap = F.adaptive_avg_pool2d(meta_out,(1,1))
+            out_age = meta_model.branch_age(ap)
+            out_gender = meta_model.branch_gender(ap)
+            out_weight = meta_model.branch_weight(ap)
+            out_height = meta_model.branch_height(ap)
+
+            out_age = int(float(out_age) * meta_info['age_denominator'] + meta_info['age_min'])
+            if out_gender[0,0] >= out_gender[0,1]:
+                out_gender = 'male'
+            else:
+                out_gender = 'female'
+            out_weight = int(float(out_weight) * meta_info['weight_denominator'] + meta_info['weight_min'])
+            out_height = int(float(out_height) * meta_info['height_denominator'] + meta_info['height_min'])
+
+            
             # restore original size
             outputs = F.interpolate(outputs, size=(2048, 2048), mode="bilinear")
             outputs = torch.sigmoid(outputs)
             outputs = (outputs > thr).detach().cpu().numpy()
-   
+            
             for output, image_name in zip(outputs, image_names):
                 for c, segm in enumerate(output):
                     rle = encode_mask_to_rle(segm)
                     rles.append(rle)
                     filename_and_class.append(f"{IND2CLASS[c]}_{image_name}")
-   
-    return rles, filename_and_class
+                    
+    return rles, filename_and_class, out_age, out_gender, out_weight, out_height
 
 def main():
 
@@ -128,7 +177,7 @@ def main():
         if upload_file is not None and seg:
             with st.spinner('Wait for it...'):
 
-                model = load_model()
+                model, model2 = load_model()
                 tf = A.Resize(512, 512)
                 test_dataset = dataset.XRayInferenceDataset(transforms=tf, stream=True)
                 test_loader = DataLoader(
@@ -138,7 +187,7 @@ def main():
                     num_workers=2,
                     drop_last=False
                 )
-                rles, filename_and_class = test(model, test_loader)
+                rles, filename_and_class, out_age, out_gender, out_weight, out_height = test(model, model2, test_loader)
                 preds = []
                 for rle in rles[:len(CLASSES)]:
                     pred = decode_rle_to_mask(rle, height=2048, width=2048)
@@ -154,7 +203,9 @@ def main():
                     array = all_label2rgb(preds)
                 pred_image = Image.fromarray(array)
                 st.image(pred_image)
+                st.text(f'나이 : {out_age}, 성별 : {out_gender}, 몸무게 : {out_weight}, 키 : {out_height}')
             st.success('Done!')
+
         
 if __name__ == '__main__':
     main()

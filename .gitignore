@@ -5,3 +5,4 @@ grad_images
 *.sh
 *.jpg
 *.pt
+*.pth
