@@ -258,7 +258,7 @@ def main(args):
 
     if args.seed != 'up':
         set_seed(int(args.seed))
-        train_loader, valid_loader = make_dataset(seed=int(args.seed), args.debug)
+        train_loader, valid_loader = make_dataset(args.debug, seed=int(args.seed))
     else:
         set_seed(0)
         train_loader, valid_loader = make_dataset(seed=0)
