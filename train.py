@@ -256,10 +256,10 @@ def main(args):
     optimizer = optim.Adam(params=model.parameters(), lr=LR, weight_decay=1e-6)
 
     if args.seed != 'up':
-        set_seed(args.seed)
+        set_seed(int(args.seed))
         train_loader, valid_loader = make_dataset(args.debug)
     else:
-        set_seed(args.seed)
+        set_seed(0)
         train_loader, valid_loader = make_dataset()
 
     check_path(args.save_dir)
@@ -268,7 +268,7 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--seed", type=int, default=0, help="random seed (default: 0), select one of [0,1,2,3,4]")
+    parser.add_argument("--seed", default=0, help="random seed (default: 0), select one of [0,1,2,3,4]")
     parser.add_argument("--loss", type=str, default="comb_loss")
     parser.add_argument("--model", type=str, default="FCN")
     parser.add_argument("--epochs", type=int, default=100)
