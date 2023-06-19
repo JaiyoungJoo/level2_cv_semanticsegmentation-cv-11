@@ -45,13 +45,13 @@ def check_path(path):
     if not os.path.isdir(path):                                                           
         os.makedirs(path)
 
-def make_dataset(debug="False"):
+def make_dataset(seed,debug="False"):
     # dataset load
     tf = A.Resize(512, 512)
     train_transform, val_transform = get_transform()
     if args.transform=='True':
-        train_dataset = XRayDataset(is_train=True, transforms=train_transform, dataclean=args.dataclean)
-        valid_dataset = XRayDataset(is_train=False, transforms=val_transform, dataclean=args.dataclean)
+        train_dataset = XRayDataset(is_train=True, transforms=train_transform, seed=seed ,dataclean=args.dataclean)
+        valid_dataset = XRayDataset(is_train=False, transforms=val_transform, seed=seed ,dataclean=args.dataclean)
     else:
         train_dataset = XRayDataset(is_train=True, transforms=tf, dataclean=args.dataclean)
         valid_dataset = XRayDataset(is_train=False, transforms=tf, dataclean=args.dataclean)
@@ -176,12 +176,13 @@ def train(model, data_loader, val_loader, criterion, optimizer, args):
     
     n_class = len(CLASSES)
     best_dice = 0.
-    seed = 0
+    up_seed = 0
     for epoch in range(args.epochs):
         if args.seed == 'up'and epoch % 5 == 0:
-            seed += 1
-            set_seed(seed)
-            data_loader, valid_loader = make_dataset()
+            up_seed += 1
+            set_seed(up_seed)
+            print(f'current seed: {up_seed}')
+            data_loader, valid_loader = make_dataset(seed=up_seed)
 
 
         model.train()
@@ -257,10 +258,10 @@ def main(args):
 
     if args.seed != 'up':
         set_seed(int(args.seed))
-        train_loader, valid_loader = make_dataset(args.debug)
+        train_loader, valid_loader = make_dataset(seed=int(args.seed), args.debug)
     else:
         set_seed(0)
-        train_loader, valid_loader = make_dataset()
+        train_loader, valid_loader = make_dataset(seed=0)
 
     check_path(args.save_dir)
     train(model, train_loader, valid_loader, criterion, optimizer, args)

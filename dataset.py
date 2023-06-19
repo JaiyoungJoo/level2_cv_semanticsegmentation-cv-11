@@ -168,7 +168,7 @@ class XRayInferenceDataset(Dataset):
         return image, image_name
 
 class XRayDataset(Dataset):
-    def __init__(self, is_train=True, transforms=None, seed = 21, dataclean = None):
+    def __init__(self, is_train=True, transforms=None, seed = -1, dataclean = None):
         pngs, jsons = check_size_of_dataset(IMAGE_ROOT, LABEL_ROOT)
         self.dataclean = dataclean
         if self.dataclean:
