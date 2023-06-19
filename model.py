@@ -338,3 +338,36 @@ class MultiModalV3(nn.Module):
         out_height = self.branch_height(ap) # out_flatten -> out
         
         return  out_segment, out_age, out_gender, out_weight, out_height
+    
+
+class MultiModalV4(nn.Module):
+    def __init__(self, in_features=29, encoder = 'densenet169'):
+        super().__init__()
+
+        self.net = torch.load('/opt/ml/input/weights/MultiModalV3/MultiModalV3_HR_200.pt')
+
+        self.net.branch_age = nn.Sequential(
+                        nn.Flatten(),
+                        nn.Linear(29,1)
+                    )
+
+        self.net.branch_gender = nn.Sequential(
+                        nn.Flatten(),
+                        nn.Linear(29,2)
+                    )
+
+        self.net.branch_weight = nn.Sequential(
+                        nn.Flatten(),
+                        nn.Linear(29,1)
+                    )
+
+        self.net.branch_height = nn.Sequential(
+                        nn.Flatten(),
+                        nn.Linear(29,1)
+                    )
+
+    def forward(self, x, age, gender, weight, height):
+
+        out_segment, out_age, out_gender, out_weight, out_height = self.net(x,age,gender,weight,height)
+        
+        return  out_segment, out_age, out_gender, out_weight, out_height
