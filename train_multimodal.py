@@ -45,7 +45,7 @@ def check_path(path):
     if not os.path.isdir(path):                                                           
         os.makedirs(path)
 
-def make_dataset(seed, debug="False"):
+def make_dataset(debug="False",seed=0):
     # dataset load
     tf = A.Resize(512, 512)
     train_transform, val_transform = get_transform()
