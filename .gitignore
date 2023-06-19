@@ -4,3 +4,5 @@ grad_images
 *.out
 *.sh
 *.jpg
+*.pt
+*.pth
