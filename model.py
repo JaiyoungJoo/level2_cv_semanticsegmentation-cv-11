@@ -300,7 +300,7 @@ class MultiModalV3(nn.Module):
         self.branch_gender = nn.Sequential(
                 nn.Flatten(),
                 nn.Linear(in_features,2),
-                nn.Softmax()
+                nn.Softmax(dim=1)
             )
         self.branch_weight = nn.Sequential(
                 nn.Flatten(),
