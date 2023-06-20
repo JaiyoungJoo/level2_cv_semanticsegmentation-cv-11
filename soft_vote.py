@@ -71,10 +71,9 @@ def dice_coef(y_true, y_pred):
     return (2. * intersection + eps) / (torch.sum(y_true_f, -1) + torch.sum(y_pred_f, -1) + eps)
 
 
-def test(model, model2, data_loader, thr=1):
-    model = model.cuda()
-    model.eval()
-
+def test(models, data_loader, thr=1):
+    models = [model.cuda().eval() for model in models]
+    thr = len(models) * 0.5
     rles = []
     filename_and_class = []
     with torch.no_grad():
@@ -82,22 +81,16 @@ def test(model, model2, data_loader, thr=1):
 
         for step, (images, image_names) in tqdm(enumerate(data_loader), total=len(data_loader)):
             images = images.cuda()    
-            outputs = model(images)
-            outputs2 = model2(images)
-            # masks = masks.detach().cpu()
-            
-            # restore original size
-            outputs = F.interpolate(outputs, size=(2048, 2048), mode="bilinear")        #(batch, 29, 2048, 2048)
-            outputs = torch.sigmoid(outputs)
+            outputs_list = []
+            for model in models:
+                outputs_list.append(model(images))
+            outputs = torch.zeros(BATCH_SIZE, 29, 2048, 2048).cuda()
+            for output in outputs_list:
+                output = F.interpolate(output, size=(2048, 2048), mode="bilinear") 
+                output = torch.sigmoid(output)
+                outputs = outputs + output
 
-            
-            # restore original size
-            outputs2 = F.interpolate(outputs2, size=(2048, 2048), mode="bilinear")        #(batch, 29, 2048, 2048)
-            outputs2 = torch.sigmoid(outputs2)
-
-            outputs = outputs + outputs2
             outputs = (outputs > thr).detach().cpu().numpy()
-            
 
             for output, image_name in zip(outputs, image_names):                        #iterating batch
                 for c, segm in enumerate(output):                                       #iterating classes
@@ -110,23 +103,22 @@ def test(model, model2, data_loader, thr=1):
 
 
 def main():
-    model = torch.load(MODEL_ROOT)
-    model2 = torch.load(MODEL_ROOT2)
-    
+    models = []
+    for model in MODELS:
+        models.append(torch.load(model))
+    tf = A.Resize(1024, 1024)
 
-    tf = A.Resize(512, 512)
-
-    test_dataset = dataset.XRayInferenceDataset(transforms=tf)
-
+    test_dataset = dataset.XRayInferenceDataset(transforms=tf)          #1024 모델을 위한 데이터 로더
+                                                                        #다른 input의 모델은 추가적인 데이터 로더를 구성해서 넣어주어야함
     test_loader = DataLoader(
         dataset=test_dataset, 
         batch_size=BATCH_SIZE,
         shuffle=False,
-        num_workers=2,
+        num_workers=4,
         drop_last=False
     )
 
-    rles, filename_and_class = test(model, model2, test_loader)
+    rles, filename_and_class = test(models, test_loader)
 
     classes, filename = zip(*[x.split("_") for x in filename_and_class])
 
@@ -138,7 +130,9 @@ def main():
         "rle": rles,
     })
 
-    save_path = f"{SAVED_DIR}/{MODEL_NAME}"
+    # save_path = f"{SAVED_DIR}/{'_'.join(RESULTPATH)}"     #GPU 남으면 테스트
+    save_path = f"{SAVED_DIR}/softvoting"
+
     csv_name = exist_csv(save_path)
     df.to_csv(csv_name, index=False)
     
@@ -147,20 +141,16 @@ if __name__ == '__main__':
     
     # Data and model checkpoints directories
     parser.add_argument('--batch_size', type=int, default=2, help='input batch size for validing (default: 2)')
-    # Container environment
     parser.add_argument('--data_path', type=str, default='/opt/ml/input/data/test/DCM')
-    parser.add_argument('--model_path', type=str, default='/opt/ml/input/result/deeplabv3_resnet101_best_model_seedup.pt')
-    parser.add_argument('--model_path2', type=str, default='/opt/ml/input/result/deeplabv3_resnet101_best_model_seedup.pt')
     parser.add_argument('--output_path', type=str, default='/opt/ml/input/result')
+    parser.add_argument('--models', nargs='+', help='Input a list')
     
     args = parser.parse_args()
     
     BATCH_SIZE = args.batch_size
     IMAGE_ROOT = args.data_path
-    MODEL_ROOT = args.model_path
-    MODEL_ROOT2 = args.model_path2
     SAVED_DIR = args.output_path
-    
+    MODELS = args.models
     if not os.path.isdir(SAVED_DIR):                                                           
         os.mkdir(SAVED_DIR)
     
@@ -177,10 +167,15 @@ if __name__ == '__main__':
 
     IND2CLASS = {v: k for k, v in CLASS2IND.items()}
     
-    MODEL_NAME = MODEL_ROOT.split('/')[-1].split('.')[0] # 절대 경로 제거
-    MODEL_NAME = MODEL_NAME.replace('_best_model', '')
+    # RESULTPATH = [model.split('/')[-1].split('.')[0] for model in args.models]
+    # print(RESULTPATH)
+    # print(models)
 
-    MODEL_NAME2 = MODEL_ROOT2.split('/')[-1].split('.')[0] # 절대 경로 제거
-    MODEL_NAME2 = MODEL_NAME2.replace('_best_model', '')
+    #경로 설정 완료 되면 아래 줄 제거
+    # MODEL_NAME = MODEL_ROOT.split('/')[-1].split('.')[0] # 절대 경로 제거
+    # MODEL_NAME = MODEL_NAME.replace('_best_model', '')
+
+    # MODEL_NAME2 = MODEL_ROOT2.split('/')[-1].split('.')[0] # 절대 경로 제거
+    # MODEL_NAME2 = MODEL_NAME2.replace('_best_model', '')
     
     main()
