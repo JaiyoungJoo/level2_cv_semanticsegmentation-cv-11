@@ -2,6 +2,7 @@ import os
 import random
 import datetime
 import argparse
+import time
 from importlib import import_module
 import ssl
 # external library
@@ -42,17 +43,25 @@ def check_path(path):
     if not os.path.isdir(path):                                                           
         os.makedirs(path)
 
-def make_dataset(debug="False"):
+def make_dataset(seed, debug="False"):
     # dataset load
-    # tf = A.Resize(512, 512)
     tf = None
-    train_transform, val_transform = get_transform()
+    train_transform = A.Compose([
+        # A.Resize(2048,2048),
+        A.ElasticTransform(p=0.5, alpha=300, sigma=20, alpha_affine=50),
+        A.Rotate(limit=45),
+        A.RandomContrast(limit=[0,0.5],p=1)
+    ])
+    val_transform = A.Compose([
+        # A.Resize(2048,2048),
+    ])
+
     if args.transform=='True':
-        train_dataset = XRayDataset(is_train=True, transforms=train_transform, dataclean=args.dataclean)
-        valid_dataset = XRayDataset(is_train=False, transforms=val_transform, dataclean=args.dataclean)
+        train_dataset = XRayDataset_gray(is_train=True, transforms=train_transform, seed=seed)
+        valid_dataset = XRayDataset_gray(is_train=False, transforms=val_transform, seed=seed)
     else:
-        train_dataset = XRayDataset(is_train=True, transforms=tf, dataclean=args.dataclean)
-        valid_dataset = XRayDataset(is_train=False, transforms=tf, dataclean=args.dataclean)
+        train_dataset = XRayDataset_gray(is_train=True, transforms=tf, seed=seed)
+        valid_dataset = XRayDataset_gray(is_train=False, transforms=tf, seed=seed)
     if debug=="True":
         train_subset_size = int(len(train_dataset) * 0.1)
 
@@ -95,7 +104,7 @@ def dice_coef(y_true, y_pred):
 
 def save_model(model, args):
     
-    output_path = os.path.join(args.save_dir, f"grey_{args.model}_{args.encoder}_{args.loss}_{args.epochs}.pt")    #아래의 wandb쪽의 name과 동시 수정할것
+    output_path = os.path.join(args.save_dir, f"gray_{args.model}_{args.encoder}_{args.transform}_{args.loss}_{args.epochs}.pt")    #아래의 wandb쪽의 name과 동시 수정할것
     torch.save(model, output_path)
 
 def set_seed(seed):
@@ -114,7 +123,7 @@ def wandb_config(args):
                     'max_epoch':args.epochs},
             project='Segmentation',
             entity='aivengers_seg',
-            name=f'grey_{args.model}_{args.encoder}_{args.loss}_{args.epochs}'
+            name=f'grey_{args.model}_{args.encoder}_{args.transform}_{args.loss}_{args.epochs}'
             )
 
 def validation(epoch, model, data_loader, criterion, thr=0.5):
@@ -169,12 +178,13 @@ def train(model, data_loader, val_loader, criterion, optimizer, args):
     
     n_class = len(CLASSES)
     best_dice = 0.
-    seed = 0
+    up_seed = 0
     for epoch in range(args.epochs):
         if args.seed == 'up'and epoch % 5 == 0:
-            seed += 1
-            set_seed(seed)
-            data_loader, valid_loader = make_dataset()
+            up_seed += 1
+            set_seed(up_seed)
+            print(f'current seed: {up_seed}')
+            data_loader, valid_loader = make_dataset(seed = up_seed)
 
 
         model.train()
@@ -237,11 +247,11 @@ def main(args):
     optimizer = optim.Adam(params=model.parameters(), lr=LR, weight_decay=1e-6)
 
     if args.seed != 'up':
-        set_seed(args.seed)
+        set_seed(int(args.seed))
         train_loader, valid_loader = make_dataset(args.debug)
     else:
         set_seed(0)
-        train_loader, valid_loader = make_dataset()
+        train_loader, valid_loader = make_dataset(seed=0)
 
     check_path(args.save_dir)
     train(model, train_loader, valid_loader, criterion, optimizer, args)
@@ -249,7 +259,7 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--seed", type=int, default=0, help="random seed (default: 0), select one of [0,1,2,3,4]")
+    parser.add_argument("--seed", default=0, help="random seed (default: 0), select one of [0,1,2,3,4]")
     parser.add_argument("--loss", type=str, default="bce_loss")
     parser.add_argument("--model", type=str, default="FPN_gray")
     parser.add_argument("--epochs", type=int, default=100)
@@ -261,7 +271,7 @@ if __name__ == '__main__':
     parser.add_argument("--debug", type=str, default="False")
     parser.add_argument("--transform",type=str, default="False")
     # parser.add_argument("--acc_steps", type=str, default="False") # acc_steps 기능 추가 필요
-    parser.add_argument("--dataclean",type=str, default="True")
+    # parser.add_argument("--dataclean",type=str, default="True")
 
     args = parser.parse_args()
     if args.model == 'Pretrained_torchvision' or 'Pretrained_smp':
