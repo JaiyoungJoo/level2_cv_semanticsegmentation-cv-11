@@ -454,7 +454,7 @@ class XRayDataset_valid(Dataset):
         return image, image_name, label   
 
 class XRayDataset_gray(Dataset):
-    def __init__(self, is_train=True, transforms=None):
+    def __init__(self, is_train=True, transforms=None, seed = -1):
         pngs, jsons = check_size_of_dataset(IMAGE_ROOT, LABEL_ROOT)
         
         _filenames = np.array(pngs)
@@ -478,7 +478,7 @@ class XRayDataset_gray(Dataset):
         for i, (x, y) in enumerate(gkf.split(_filenames, ys, groups)):
             if is_train:
                 # 0번을 validation dataset으로 사용합니다.
-                if i == 0:
+                if i == (seed+4)%5:
                     continue
                     
                 filenames += list(_filenames[y])
