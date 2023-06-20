@@ -59,6 +59,10 @@ def decode_rle_to_mask(rle, height, width):
     return img.reshape(height, width)
     
 def test(model, data_loader, thr=0.5,tta_enabled=False):
+    tta_transforms = tta.Compose([
+        tta.HorizontalFlip()
+    ])
+    
     model = model.cuda()
     model.eval()
 
@@ -91,7 +95,7 @@ def test(model, data_loader, thr=0.5,tta_enabled=False):
 
 def main():
     model = torch.load(MODEL_ROOT)
-    tf = A.Resize(512, 512)
+    tf = A.Resize(1024,1024)
 
     test_dataset = dataset.XRayInferenceDataset(transforms=tf)
 
@@ -102,13 +106,9 @@ def main():
         num_workers=2,
         drop_last=False
     )
-    tta_transforms = tta.Compose([
-        tta.Resize((512,512)),
-        tta.HorizontalFlip()
-    ])
     
     if args.tta=='True':
-        rles, filename_and_class = test(tta_model, test_loader,tta_enabled=True)
+        rles, filename_and_class = test(model, test_loader,tta_enabled=True)
     else:
         rles, filename_and_class = test(model, test_loader,tta_enabled=False)
         
