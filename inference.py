@@ -60,7 +60,14 @@ def decode_rle_to_mask(rle, height, width):
     
 def test(model, data_loader, thr=0.5,tta_enabled=False):
     tta_transforms = tta.Compose([
-        tta.HorizontalFlip()
+        tta.HorizontalFlip(),
+        # tta.Scale(scales=[0.5,1,2]),
+        # tta.Rotate90(angle[0,90]),
+        # tta.Multiply(factors=[0.8, 0.9, 1, 1.1]),
+        # tta.FiveCrops(928,928),
+        tta.Multiply(factors=[0.9, 1, 1.1,1.2]),
+        
+        
     ])
     
     model = model.cuda()
