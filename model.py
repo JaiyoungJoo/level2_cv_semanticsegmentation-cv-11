@@ -372,9 +372,9 @@ class MultiModalV4(nn.Module):
         
         return  out_segment, out_age, out_gender, out_weight, out_height
     
-class Autoencoder2(nn.Module):
+class Autoencoder(nn.Module):
     def __init__(self, input_size = 512, code_size = 32):
-        super(Autoencoder2, self).__init__()
+        super(Autoencoder, self).__init__()
 
         # 입력 이미지 크기
         self.input_size = input_size
@@ -382,30 +382,31 @@ class Autoencoder2(nn.Module):
 
         # 인코더
         self.encoder = nn.Sequential(
-            nn.Conv2d(3, 32, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(3, 16, kernel_size=3, stride=1, padding=1),
             nn.ReLU(True),
             nn.MaxPool2d(kernel_size=2, stride=2),
-            nn.Conv2d(32,64, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(16, 8, kernel_size=3, stride=1, padding=1),
             nn.ReLU(True),
             nn.MaxPool2d(kernel_size=2, stride=2),
-            nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(8, 4, kernel_size=3, stride=1, padding=1),
             nn.ReLU(True),
             nn.MaxPool2d(kernel_size=2, stride=2)
         )
 
         # 잠재 변수
-        self.latent = nn.Linear(128 * (self.input_size // 8) * (self.input_size // 8), self.code_size)
+        self.latent = nn.Linear(4 * (self.input_size // 8) * (self.input_size // 8), self.code_size)
 
         # 디코더
         self.decoder = nn.Sequential(
-            nn.Linear(self.code_size, 128 * (self.input_size // 8) * (self.input_size // 8)),
+            nn.Linear(32, 4 * (self.input_size // 8) * (self.input_size // 8)),
             nn.ReLU(True),
-            nn.Unflatten(1, (128, self.input_size // 8, self.input_size // 8)),
-            nn.ConvTranspose2d(128, 64, kernel_size=3, stride=2, padding=1, output_padding=1),
+            nn.Unflatten(1, (4, self.input_size // 8, self.input_size // 8)),
+            nn.ConvTranspose2d(4, 8, kernel_size=3, stride=2, padding=1, output_padding=1),
             nn.ReLU(True),
-            nn.ConvTranspose2d(64, 32, kernel_size=3, stride=2, padding=1, output_padding=1),
+            nn.ConvTranspose2d(8, 16, kernel_size=3, stride=2, padding=1, output_padding=1),
             nn.ReLU(True),
-            nn.ConvTranspose2d(32, 3, kernel_size=3, stride=2, padding=1, output_padding=1),
+            nn.ConvTranspose2d(16, 3, kernel_size=3, stride=2, padding=1, output_padding=1),
+            nn.Sigmoid()
         )
 
     def forward(self, x):
@@ -414,3 +415,35 @@ class Autoencoder2(nn.Module):
         latent_var = self.latent(x)
         x = self.decoder(latent_var)
         return x, latent_var
+    
+
+class Encoder(nn.Module):
+    def __init__(self, input_size = 2048, code_size = 32):
+        super(Encoder, self).__init__()
+
+        # 입력 이미지 크기
+        self.input_size = input_size
+        self.code_size = code_size
+
+        # 인코더
+        self.encoder = nn.Sequential(
+            nn.Conv2d(3, 16, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Conv2d(16, 8, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Conv2d(8, 4, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(True),
+            nn.MaxPool2d(kernel_size=2, stride=2)
+        )
+
+        # 잠재 변수
+        self.latent = nn.Linear(4 * (self.input_size // 8) * (self.input_size // 8), self.code_size)
+
+    def forward(self, x):
+        x = self.encoder(x)
+        x = torch.flatten(x, 1)
+        print(x.shpea)
+        latent_var = self.latent(x)
+        return latent_var
