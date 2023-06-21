@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from segmentation_models_pytorch import losses
+from skimage.metrics import structural_similarity as ssim
 
 def bce_loss(pred, target):
     loss_function = nn.BCEWithLogitsLoss()
@@ -68,3 +69,16 @@ def comb_loss(pred, target):
     jaccard = smp_jaccard_loss(pred, target)
     loss = (0.1*bce) + (0.6*dice) + (0.3*jaccard)
     return loss
+
+def ssim_loss(output, target):
+    output_gray = F.rgb_to_grayscale(output).cpu()
+    target_gray = F.rgb_to_grayscale(target).cpu()
+    output_gray = output_gray.detach().numpy()
+    target_gray = target_gray.detach().numpy()
+    loss = []
+    for i in range(16):
+        ssim_value, diff = ssim(output_gray[i][0], target_gray[i][0],data_range=output_gray[i].max() - output_gray[i].min(), full=True)
+        ssim_loss = 1 - ssim_value
+        loss.append(ssim_loss)
+
+    return sum(loss)/16
