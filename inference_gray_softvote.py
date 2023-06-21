@@ -85,7 +85,7 @@ def test(models, gray_model, data_loader, gray_loader, thr=0.5):
                 output = torch.sigmoid(output)
                 outputs = outputs + output
 
-            outputs = (outputs > thr).detach().cpu().numpy()
+            outputs = (outputs > thr)
 
             gray_outputs = torch.sigmoid(gray_outputs)
             gray_outputs = (gray_outputs > 0.5)
