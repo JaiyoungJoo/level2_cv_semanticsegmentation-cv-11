@@ -87,7 +87,7 @@ def test(model, data_loader, thr=0.5):
 def main():
     model = torch.load(MODEL_ROOT)
 
-    tf = A.Resize(512, 512)
+    tf = A.Resize(1024, 1024)
 
     test_dataset = dataset.XRayInferenceDataset_Multi(transforms=tf)
 
@@ -122,7 +122,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=2, help='input batch size for validing (default: 2)')
     # Container environment
     parser.add_argument('--data_path', type=str, default='/opt/ml/input/data/test/DCM')
-    parser.add_argument('--model_path', type=str, default='/opt/ml/weights/fcn_resnet101_best_model/MultiModal_resnet101_300.pt')
+    parser.add_argument('--model_path', type=str, default='/opt/ml/input/weights/MultiModalV4_HR_150_noseedup/Pretrained_Multimodal_HR_200.pt')
     parser.add_argument('--output_path', type=str, default='/opt/ml/input/result')
     
     args = parser.parse_args()

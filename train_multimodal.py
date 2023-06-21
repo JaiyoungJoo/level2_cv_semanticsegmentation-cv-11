@@ -28,7 +28,7 @@ import time
 from pytz import timezone
 
 
-LR = 1e-4
+LR = 1e-5
 CLASSES = [
     'finger-1', 'finger-2', 'finger-3', 'finger-4', 'finger-5',
     'finger-6', 'finger-7', 'finger-8', 'finger-9', 'finger-10',
@@ -149,7 +149,7 @@ def validation(epoch, model, data_loader, criterion, thr=0.5):
             weights_criterion =  getattr(import_module("loss"), 'mse_loss')(weights_, weights)
             heights_criterion =  getattr(import_module("loss"), 'mse_loss')(heights_, heights)
 
-            loss = segmentation_criterion*0.5 + age_criterion*0.1 + genders_criterion*0.1 + weights_criterion*0.1 + heights_criterion*0.1
+            loss = segmentation_criterion + age_criterion*0 + genders_criterion*0 + weights_criterion*0 + heights_criterion*0
             total_loss += loss
             cnt += 1
             
@@ -183,7 +183,7 @@ def train(model, data_loader, val_loader, criterion, optimizer, args):
     
     n_class = len(CLASSES)
     best_dice = 0.
-    up_seed = 0
+    up_seed = 33
     for epoch in range(args.epochs):
         if args.seed == 'up'and epoch % 5 == 0:
             up_seed += 1
@@ -209,7 +209,7 @@ def train(model, data_loader, val_loader, criterion, optimizer, args):
             weights_criterion =  getattr(import_module("loss"), 'mse_loss')(weights_, weights)
             heights_criterion =  getattr(import_module("loss"), 'mse_loss')(heights_, heights)
 
-            loss = segmentation_criterion + age_criterion*0.1 + genders_criterion*0.1 + weights_criterion*0.1 + heights_criterion*0.1
+            loss = segmentation_criterion + age_criterion*0 + genders_criterion*0 + weights_criterion*0 + heights_criterion*0
             if args.acc_steps == 'False':
                 optimizer.zero_grad()
                 loss.backward()
@@ -287,8 +287,8 @@ def main(args):
         set_seed(int(args.seed))
         train_loader, valid_loader = make_dataset(args.debug, seed=int(args.seed))
     else:
-        set_seed(0)
-        train_loader, valid_loader = make_dataset(seed=0)
+        set_seed(33)
+        train_loader, valid_loader = make_dataset(seed=33)
 
     check_path(args.save_dir)
     train(model, train_loader, valid_loader, criterion, optimizer, args)
@@ -300,13 +300,13 @@ if __name__ == '__main__':
     parser.add_argument("--loss", type=str, default="comb_loss")
     parser.add_argument("--model", type=str, default="MultiModalV4")
     parser.add_argument("--epochs", type=int, default=200)
-    parser.add_argument("--val_every", type=int, default=1)
+    parser.add_argument("--val_every", type=int, default=5)
     parser.add_argument("--train_batch", type=int, default=3, help = 'image size 1024 - batch 4 이하, 512 - 8이하')
     parser.add_argument("--train_workers", type=int, default=4, help = 'default = 4 (==batch_size)')
     parser.add_argument("--wandb", type=str, default="True")
     parser.add_argument("--encoder", type=str, default="HR")
     parser.add_argument("--save_dir", type=str, default="/opt/ml/input/weights/")
-    parser.add_argument("--model_path", type=str, default="/opt/ml/weights/fcn_resnet101_best_model.pt")
+    parser.add_argument("--model_path", type=str, default="/opt/ml/input/weights/MultiModalV4/MultiModalV4_HR_150_noseedup.pt")
     parser.add_argument("--debug", type=str, default="False")
     parser.add_argument("--transform",type=str, default="True")
     parser.add_argument("--acc_steps", type=str, default="False")
