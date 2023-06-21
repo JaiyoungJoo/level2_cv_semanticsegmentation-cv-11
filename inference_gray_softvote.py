@@ -58,7 +58,7 @@ def decode_rle_to_mask(rle, height, width):
     return img.reshape(height, width)
 
 
-def test(model, model2, model3, gray_model, data_loader, gray_loader, thr=0.5):
+def test(models, gray_model, data_loader, gray_loader, thr=0.5):
     models = [model.cuda().eval() for model in models]
     thr = len(models) * 0.5
 
