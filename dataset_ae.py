@@ -62,3 +62,34 @@ class AEDataset(Dataset):
         image = torch.from_numpy(image).float()
             
         return image
+    
+    
+class AE_Test_Dataset(Dataset):
+    def __init__(self, transforms=None):
+        pngs = sorted(list(ABNORMAL_PNGS))
+        _filenames = np.array(pngs)
+        
+        self.filenames = _filenames
+        self.transforms = transforms
+    
+    def __len__(self):
+        return len(self.filenames)
+    
+    def __getitem__(self, item):
+
+        image_name = self.filenames[item]
+        image_path = os.path.join(IMAGE_ROOT, image_name)
+        image = cv2.imread(image_path)
+        image = image / 255.
+        
+        if self.transforms is not None:
+            inputs = {"image": image}
+            result = self.transforms(**inputs)
+            image = result["image"]
+
+        # to tenser will be done later
+        image = image.transpose(2, 0, 1)    # make channel first
+        
+        image = torch.from_numpy(image).float()
+            
+        return image
