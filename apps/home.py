@@ -34,7 +34,7 @@ IND2CLASS = {v: k for k, v in CLASS2IND.items()}
 @st.cache_resource
 def load_model():
     model = torch.load('/opt/ml/input/weights/FPN_densenet161_150/FPN_densenet169_150.pt')
-    model2 = torch.load('/opt/ml/input/weights/final/MultiModalV3_HR_200.pt')
+    model2 = torch.load('/opt/ml/input/weights/serving/for_serving_multimodal_multitask_120_1024_noseedup.pt')
     model.eval()
     model2.eval()
     return model, model2
@@ -210,9 +210,9 @@ def app():
                     st.markdown(styled_text, unsafe_allow_html=True)
                     st.image(pred_image)
                 if out_gender=='male':
-                    st.text(f'1️⃣ 나이 : {out_age} 2️⃣ 성별 :  👨  3️⃣ 몸무게: {out_weight},  4️⃣ 키 : {out_height}')
+                    st.text(f'1️⃣ 나이: {out_age} 2️⃣ 성별: 👨  3️⃣ 몸무게: {out_weight}, 4️⃣ 키: {out_height}')
                 else:
-                    st.text(f'1️⃣ 나이 : {out_age} 2️⃣ 성별 :  👩  3️⃣ 몸무게 : {out_weight}, 4️⃣ 키 : {out_height}')
+                    st.text(f'1️⃣ 나이: {out_age} 2️⃣ 성별: 👩  3️⃣ 몸무게: {out_weight}, 4️⃣ 키: {out_height}')
             
                 
         st.markdown(
@@ -229,5 +229,3 @@ def app():
             """,
             unsafe_allow_html=True,
         )
-
-
