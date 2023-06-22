@@ -148,7 +148,7 @@ class XRayInferenceDataset(Dataset):
     def __getitem__(self, item):
         if self.stream:
             image_name = 'img.jpg'
-            image_path = '/opt/ml/level2_cv_semanticsegmentation-cv-11/' + image_name
+            image_path = '/opt/ml/input/level2_cv_semanticsegmentation-cv-11/' + image_name
         else: 
             image_name = self.filenames[item]
             image_path = os.path.join(TEST_ROOT, image_name)
