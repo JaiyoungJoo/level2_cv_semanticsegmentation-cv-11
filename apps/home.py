@@ -89,12 +89,12 @@ def test(model, meta_model,data_loader, thr=0.5,tta_enabled=False):
         for step, (images, image_names) in tqdm(enumerate(data_loader), total=len(data_loader)):
             images = images.cuda()
             outputs = model(images)
-            meta_out = meta_model.backbone(images)
+            meta_out = meta_model.net.backbone(images)
             ap = F.adaptive_avg_pool2d(meta_out,(1,1))
-            out_age = meta_model.branch_age(ap)
-            out_gender = meta_model.branch_gender(ap)
-            out_weight = meta_model.branch_weight(ap)
-            out_height = meta_model.branch_height(ap)
+            out_age = meta_model.net.branch_age(ap)
+            out_gender = meta_model.net.branch_gender(ap)
+            out_weight = meta_model.net.branch_weight(ap)
+            out_height = meta_model.net.branch_height(ap)
             
             out_age = int(float(out_age) * meta_info['age_denominator'] + meta_info['age_min'])
             if out_gender[0,0] >= out_gender[0,1]:
