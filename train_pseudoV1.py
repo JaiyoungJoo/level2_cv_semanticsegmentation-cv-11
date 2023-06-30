@@ -103,7 +103,6 @@ test_loader = DataLoader(
     drop_last=False
 )
 
-
 def dice_coef(y_true, y_pred):
     y_true_f = y_true.flatten(2)
     y_pred_f = y_pred.flatten(2)
