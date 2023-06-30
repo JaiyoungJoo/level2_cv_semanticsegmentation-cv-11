@@ -9,7 +9,7 @@ import torch
 import pandas as pd
 import albumentations as A
 import albumentations.pytorch
-
+import random
 # 데이터 경로를 입력하세요
 IMAGE_ROOT = "/opt/ml/input/data/train/DCM/"
 LABEL_ROOT = "/opt/ml/input/data/train/outputs_json/"
@@ -149,6 +149,47 @@ class XRayInferenceDataset(Dataset):
         if self.stream:
             image_name = 'img.jpg'
             image_path = '/opt/ml/input/level2_cv_semanticsegmentation-cv-11/' + image_name
+        else: 
+            image_name = self.filenames[item]
+            image_path = os.path.join(TEST_ROOT, image_name)
+        image = cv2.imread(image_path)
+        image = image / 255.
+        
+        if self.transforms is not None:
+            inputs = {"image": image}
+            result = self.transforms(**inputs)
+            image = result["image"]
+
+        # to tenser will be done later
+        image = image.transpose(2, 0, 1)    # make channel first
+        
+        image = torch.from_numpy(image).float()
+            
+        return image, image_name
+
+# Dataset Class
+class XRayDataset_pseudo(Dataset):
+    def __init__(self, transforms=None, stream=False, pseudo = False):
+        pngs = check_size_of_dataset(TEST_ROOT, False)
+        if pseudo:
+            random_pseudo = random.sample(pngs, k=12)
+            pngs = sorted(pngs + random_pseudo)
+        if stream:
+            pngs = 'img.jpg'
+        _filenames = pngs
+        _filenames = np.array(sorted(_filenames))
+        
+        self.filenames = _filenames
+        self.transforms = transforms
+        self.stream = stream
+    
+    def __len__(self):
+        return len(self.filenames)
+    
+    def __getitem__(self, item):
+        if self.stream:
+            image_name = 'img.jpg'
+            image_path = '/opt/ml/level2_cv_semanticsegmentation-cv-11/' + image_name
         else: 
             image_name = self.filenames[item]
             image_path = os.path.join(TEST_ROOT, image_name)
