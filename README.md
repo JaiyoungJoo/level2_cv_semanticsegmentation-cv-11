@@ -167,7 +167,6 @@ We use ElasticTransform(300), Rotate(limit=45) and RandomContrast(limit=[0,0.5],
 |     HorizontalFlip,     Multiply([0.9,1,1.1,1.2]),     Rotate 90    |        0.9585      |
 
 We use HorizontalFlip,     Multiply([0.9,1,1.1,1.2]) as our final TTA combination  
-You can use it by set argument when training "--transform True"
 
 
 ## Final Solution
