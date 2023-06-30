@@ -14,6 +14,8 @@ from visualization import label2rgb, decode_rle_to_mask, all_label2rgb
 import albumentations as A
 from torch.utils.data import Dataset, DataLoader
 import dataset
+from model import Encoder
+import base64
 
 CLASSES = [
     'finger-1', 'finger-2', 'finger-3', 'finger-4', 'finger-5',
@@ -35,9 +37,26 @@ IND2CLASS = {v: k for k, v in CLASS2IND.items()}
 def load_model():
     model = torch.load('/opt/ml/input/weights/FPN_densenet161_150/FPN_densenet169_150.pt')
     model2 = torch.load('/opt/ml/input/weights/serving/for_serving_multimodal_multitask_120_1024_noseedup.pt')
+    model3 = Encoder(2048).cuda()
+    state_dict = torch.load('/opt/ml/input/weights/serving/deep_svdd.pth')
+    model3.load_state_dict(state_dict['net_dict'])
+    c = torch.Tensor(state_dict['center']).cuda()
     model.eval()
     model2.eval()
-    return model, model2
+    model3.eval()
+    return model, model2, model3, c
+
+def eval(net, c, dataloader):
+   # ROC AUC score 계산
+    net.eval()
+    with torch.no_grad():
+        for x in dataloader:
+            x = x.float().cuda()
+            z = net.encoder(x)
+            z = torch.flatten(z, 0)
+            z = net.latent(z)
+            score = torch.sum((z - c) ** 2, dim=0)
+    return score
 
 # @st.cache(allow_output_mutation=True)
 # def infer(outputs):
@@ -75,21 +94,26 @@ meta_info = {'age_min' :19 , 'age_denominator' : 69 - 19,
    
 #     return rles, filename_and_class
 
-def test(model, meta_model,data_loader, thr=0.5,tta_enabled=False):
+def test(model, meta_model, anomaly_model, c, data_loader,data_loader2,data_loader3, thr=0.5,tta_enabled=False):
     model = model.cuda()
     meta_model.cuda()
+    anomaly_model.cuda()
     model.eval()
     meta_model.eval()
+    anomaly_model.eval()
+    c.cuda()
 
     rles = []
     filename_and_class = []
     with torch.no_grad():
         n_class = len(CLASSES)
 
-        for step, (images, image_names) in tqdm(enumerate(data_loader), total=len(data_loader)):
+        for step, ((images, image_names),(images2,_),(images3,_)) in tqdm(enumerate(zip(data_loader,data_loader2,data_loader3)), total=len(data_loader)):
             images = images.cuda()
+            images2 = images2.cuda()
+            images3 = images3.cuda()
             outputs = model(images)
-            meta_out = meta_model.net.backbone(images)
+            meta_out = meta_model.net.backbone(images2)
             ap = F.adaptive_avg_pool2d(meta_out,(1,1))
             out_age = meta_model.net.branch_age(ap)
             out_gender = meta_model.net.branch_gender(ap)
@@ -111,12 +135,34 @@ def test(model, meta_model,data_loader, thr=0.5,tta_enabled=False):
             outputs = (outputs > thr).detach().cpu().numpy()
             
             for output, image_name in zip(outputs, image_names):
-                for c, segm in enumerate(output):
+                for c1, segm in enumerate(output):
                     rle = encode_mask_to_rle(segm)
                     rles.append(rle)
-                    filename_and_class.append(f"{IND2CLASS[c]}_{image_name}")
+                    filename_and_class.append(f"{IND2CLASS[c1]}_{image_name}")
+            
+        score = eval(anomaly_model, c, images3)
+        if score>= 24.7:  
+            check_anomal= True
+        else:
+            check_anomal =False
                     
-    return rles, filename_and_class, out_age, out_gender, out_weight, out_height
+    return rles, filename_and_class, out_age, out_gender, out_weight, out_height, score, check_anomal
+
+def addline(image):
+    image_array = np.array(image)
+
+    # Add red border to the image array
+    border_width = 15
+    border_color = (255, 0, 0)  # Red color
+    image_array[0:border_width, :] = border_color
+    image_array[-border_width:, :] = border_color
+    image_array[:, 0:border_width] = border_color
+    image_array[:, -border_width:] = border_color
+
+    # Convert the modified image array back to PIL image
+    modified_image = Image.fromarray(image_array)
+
+    return modified_image
 
 def app():
     st.title(":hand: Hand :bone: Bone :blue[Segmentation]")
@@ -180,17 +226,36 @@ def app():
         with col2:
             if upload_file is not None and seg:
                 with st.spinner('Loading..'):
-                    model, model2 = load_model()
-                    tf = A.Resize(512, 512)
-                    test_dataset = dataset.XRayInferenceDataset(transforms=tf, stream=True)
-                    test_loader = DataLoader(
-                        dataset=test_dataset, 
+                    model, model2, model3, c = load_model()
+                    tf1 = A.Resize(512, 512)
+                    tf2 = A.Resize(1024, 1024)
+                    tf3 = A.Resize(2048, 2048)
+                    test_dataset1 = dataset.XRayInferenceDataset(transforms=tf1, stream=True)
+                    test_dataset2 = dataset.XRayInferenceDataset(transforms=tf2, stream=True)
+                    test_dataset3 = dataset.XRayInferenceDataset(transforms=tf3, stream=True)
+                    test_loader1 = DataLoader(
+                        dataset=test_dataset1, 
                         batch_size=1,
                         shuffle=False,
                         num_workers=2,
                         drop_last=False
                     )
-                    rles, filename_and_class, out_age, out_gender, out_weight, out_height = test(model, model2, test_loader)
+                    test_loader2 = DataLoader(
+                        dataset=test_dataset2, 
+                        batch_size=1,
+                        shuffle=False,
+                        num_workers=2,
+                        drop_last=False
+                    )
+                    test_loader3 = DataLoader(
+                        dataset=test_dataset3, 
+                        batch_size=1,
+                        shuffle=False,
+                        num_workers=2,
+                        drop_last=False
+                    )
+                    
+                    rles, filename_and_class, out_age, out_gender, out_weight, out_height, score, check_anomal = test(model, model2,model3,c,test_loader1,test_loader2,test_loader3)
                     preds = []
                     for rle in rles[:len(CLASSES)]:
                         pred = decode_rle_to_mask(rle, height=2048, width=2048)
@@ -208,11 +273,29 @@ def app():
                     text = "Bone Image"
                     styled_text = f"<h3 style='text-align: center;'>{text}</h3>"
                     st.markdown(styled_text, unsafe_allow_html=True)
-                    st.image(pred_image)
-                if out_gender=='male':
-                    st.text(f'1️⃣ 나이: {out_age} 2️⃣ 성별: 👨  3️⃣ 몸무게: {out_weight}, 4️⃣ 키: {out_height}')
+                    if check_anomal==True:
+                        pred_image=addline(pred_image)
+                        st.image(pred_image)
+                        
+                    else:
+                        st.image(pred_image)
+                            
+                if check_anomal==False:
+                    if out_gender=='male':
+                        st.text(f'1️⃣ 나이: {out_age} 2️⃣ 성별: 👨  3️⃣ 몸무게: {out_weight}, 4️⃣ 키: {out_height}')
+                    else:
+                        st.text(f'1️⃣ 나이: {out_age} 2️⃣ 성별: 👩  3️⃣ 몸무게: {out_weight}, 4️⃣ 키: {out_height}')
+                    st.subheader("정상입니다 😀")
                 else:
-                    st.text(f'1️⃣ 나이: {out_age} 2️⃣ 성별: 👩  3️⃣ 몸무게: {out_weight}, 4️⃣ 키: {out_height}')
+                    if score>10000:
+                        st.subheader("이미지를 다시 업로드 하세요")
+                    else:
+                        if out_gender=='male':
+                            st.text(f'1️⃣ 나이: {out_age} 2️⃣ 성별: 👨  3️⃣ 몸무게: {out_weight}, 4️⃣ 키: {out_height}')
+                        else:
+                            st.text(f'1️⃣ 나이: {out_age} 2️⃣ 성별: 👩  3️⃣ 몸무게: {out_weight}, 4️⃣ 키: {out_height}')
+                        st.subheader("병원을 방문해보세요 🤕")
+                    
             
                 
         st.markdown(
