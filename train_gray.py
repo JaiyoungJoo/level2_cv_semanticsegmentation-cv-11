@@ -2,6 +2,7 @@ import os
 import random
 import datetime
 import argparse
+import time
 from importlib import import_module
 import ssl
 # external library
@@ -19,15 +20,12 @@ from torch.utils.data import DataLoader, Subset
 import wandb
 
 # dataset
-from dataset import XRayDataset
+from dataset import XRayDataset, XRayDataset_gray
 from dataset import get_transform
 ssl._create_default_https_context = ssl._create_unverified_context
 
-# for time check
-import time
-from pytz import timezone
-
 # exp setting
+BATCH_SIZE = 2
 LR = 1e-4
 CLASSES = [
     'finger-1', 'finger-2', 'finger-3', 'finger-4', 'finger-5',
@@ -38,23 +36,32 @@ CLASSES = [
     'Triquetrum', 'Pisiform', 'Radius', 'Ulna',
 ]
 my_table = wandb.Table(
-    columns=["epoch"] + CLASSES)
+    columns=["epoch"] + ["grayscale"])
 
 def check_path(path):
     # 가중치 저장 경로 설정
     if not os.path.isdir(path):                                                           
         os.makedirs(path)
 
-def make_dataset(debug="False",seed=0):
+def make_dataset(seed, debug="False"):
     # dataset load
-    tf = A.Resize(512, 512)
-    train_transform, val_transform = get_transform()
+    tf = None
+    train_transform = A.Compose([
+        # A.Resize(2048,2048),
+        A.ElasticTransform(p=0.5, alpha=300, sigma=20, alpha_affine=50),
+        A.Rotate(limit=45),
+        A.RandomContrast(limit=[0,0.5],p=1)
+    ])
+    val_transform = A.Compose([
+        # A.Resize(2048,2048),
+    ])
+
     if args.transform=='True':
-        train_dataset = XRayDataset(is_train=True, transforms=train_transform, seed=seed ,dataclean=args.dataclean)
-        valid_dataset = XRayDataset(is_train=False, transforms=val_transform, seed=seed ,dataclean=args.dataclean)
+        train_dataset = XRayDataset_gray(is_train=True, transforms=train_transform, seed=seed)
+        valid_dataset = XRayDataset_gray(is_train=False, transforms=val_transform, seed=seed)
     else:
-        train_dataset = XRayDataset(is_train=True, transforms=tf, dataclean=args.dataclean)
-        valid_dataset = XRayDataset(is_train=False, transforms=tf, dataclean=args.dataclean)
+        train_dataset = XRayDataset_gray(is_train=True, transforms=tf, seed=seed)
+        valid_dataset = XRayDataset_gray(is_train=False, transforms=tf, seed=seed)
     if debug=="True":
         train_subset_size = int(len(train_dataset) * 0.1)
 
@@ -69,14 +76,14 @@ def make_dataset(debug="False",seed=0):
         valid_subset_indices = torch.randperm(len(valid_dataset))[:valid_subset_size]
         valid_dataset = Subset(valid_dataset, valid_subset_indices)
         
-
     train_loader = DataLoader(
         dataset=train_dataset, 
-        batch_size=args.train_batch,
+        batch_size=BATCH_SIZE,
         shuffle=True,
-        num_workers=args.train_workers,
+        num_workers=2,
         drop_last=True,
     )
+
     valid_loader = DataLoader(
         dataset=valid_dataset, 
         batch_size=2,
@@ -96,7 +103,8 @@ def dice_coef(y_true, y_pred):
     return (2. * intersection + eps) / (torch.sum(y_true_f, -1) + torch.sum(y_pred_f, -1) + eps)
 
 def save_model(model, args):
-    output_path = os.path.join(args.save_dir, f"{args.model}_{args.encoder}_{args.loss}_tf={args.transform}_cln={args.dataclean}_e={args.epochs}_sd={args.seed}.pt")    #아래의 wandb쪽의 name과 동시 수정할것
+    
+    output_path = os.path.join(args.save_dir, f"gray_{args.model}_{args.encoder}_{args.transform}_{args.loss}_{args.epochs}.pt")    #아래의 wandb쪽의 name과 동시 수정할것
     torch.save(model, output_path)
 
 def set_seed(seed):
@@ -109,13 +117,13 @@ def set_seed(seed):
     random.seed(seed)
 
 def wandb_config(args):
-    wandb.init(config={'batch_size':args.train_batch,
+    wandb.init(config={'batch_size':BATCH_SIZE,
                     'learning_rate':LR,                 #차차 args.~~로 update할 것
                     'seed':args.seed,
                     'max_epoch':args.epochs},
             project='Segmentation',
             entity='aivengers_seg',
-            name=f'{args.model}_{args.encoder}_{args.loss}_tf={args.transform}_cln={args.dataclean}_e={args.epochs}_sd={args.seed}'
+            name=f'grey_{args.model}_{args.encoder}_{args.transform}_{args.loss}_{args.epochs}'
             )
 
 def validation(epoch, model, data_loader, criterion, thr=0.5):
@@ -155,12 +163,6 @@ def validation(epoch, model, data_loader, criterion, thr=0.5):
     dices_per_class = torch.mean(dices, 0)
     row = np.concatenate((np.array([epoch]), np.array(dices_per_class)))
     my_table.add_data(*row)
-    dice_str = [
-        f"{c:<12}: {d.item():.4f}"
-        for c, d in zip(CLASSES, dices_per_class)
-    ]
-    dice_str = "\n".join(dice_str)
-    print(dice_str)
     avg_dice = torch.mean(dices_per_class).item()
     
     return avg_dice
@@ -182,11 +184,11 @@ def train(model, data_loader, val_loader, criterion, optimizer, args):
             up_seed += 1
             set_seed(up_seed)
             print(f'current seed: {up_seed}')
-            data_loader, valid_loader = make_dataset(seed=up_seed)
+            data_loader, valid_loader = make_dataset(seed = up_seed)
 
 
         model.train()
-        step_count = 0
+
         for step, (images, masks) in enumerate(data_loader):            
             # gpu 연산을 위해 device 할당
             images, masks = images.cuda(), masks.cuda()
@@ -194,30 +196,17 @@ def train(model, data_loader, val_loader, criterion, optimizer, args):
             
             # inference
             outputs = model(images)
+            
             # loss 계산
             loss = criterion(outputs, masks)
-            if args.acc_steps == 'False':
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-
-            else:
-                args.acc_steps = int(args.acc_steps)
-                loss = loss / args.acc_steps # 경사를 경사 누적 스텝 수로 나눔
-                loss.backward()
-                step_count += 1
-                if step_count % args.acc_steps == 0:
-                    optimizer.step()
-                    optimizer.zero_grad()
-                    step_count = 0
-                # 경사 업데이트 없이 스텝을 끝마치기 전에 경사 초기화
-                if step_count != 0 and (step_count % args.acc_steps) != 0:
-                    optimizer.zero_grad()
-
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            
             # step 주기에 따른 loss 출력
             if (step + 1) % 25 == 0:
                 print(
-                    f'{datetime.datetime.now(timezone("Asia/Seoul")).strftime("%Y-%m-%d %H:%M:%S")} | '
+                    f'{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")} | '
                     f'Epoch [{epoch+1}/{args.epochs}], '
                     f'Step [{step+1}/{len(data_loader)}], '
                     f'Loss: {round(loss.item(),4)}'
@@ -229,6 +218,8 @@ def train(model, data_loader, val_loader, criterion, optimizer, args):
         # validation 주기에 따른 loss 출력 및 best model 저장
         if (epoch + 1) % args.val_every == 0:
             dice = validation(epoch + 1, model, val_loader, criterion)
+            # if args.wandb=="True":
+            #     wandb.log(val, step = epoch)
             
             if best_dice < dice:
                 print(f"Best performance at epoch: {epoch + 1}, {best_dice:.4f} -> {dice:.4f}")
@@ -238,7 +229,6 @@ def train(model, data_loader, val_loader, criterion, optimizer, args):
 
             val={'avg_dice':dice,
                  'best_dice':best_dice}
-            
             if args.wandb=="True":
                 wandb.log(val, step = epoch)
 
@@ -258,7 +248,7 @@ def main(args):
 
     if args.seed != 'up':
         set_seed(int(args.seed))
-        train_loader, valid_loader = make_dataset(args.debug, seed=int(args.seed))
+        train_loader, valid_loader = make_dataset(args.debug)
     else:
         set_seed(0)
         train_loader, valid_loader = make_dataset(seed=0)
@@ -270,23 +260,21 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", default=0, help="random seed (default: 0), select one of [0,1,2,3,4]")
-    parser.add_argument("--loss", type=str, default="comb_loss")
-    parser.add_argument("--model", type=str, default="FCN")
+    parser.add_argument("--loss", type=str, default="bce_loss")
+    parser.add_argument("--model", type=str, default="FPN_gray")
     parser.add_argument("--epochs", type=int, default=100)
-    parser.add_argument("--val_every", type=int, default=1)
-    parser.add_argument("--train_batch", type=int, default=4, help = 'image size 1024 - batch 4 이하, 512 - 8이하')
-    parser.add_argument("--train_workers", type=int, default=4, help = 'default = 4 (==batch_size)')
+    parser.add_argument("--val_every", type=int, default=5)
     parser.add_argument("--wandb", type=str, default="True")
     parser.add_argument("--encoder", type=str, default="resnet101")
     parser.add_argument("--save_dir", type=str, default="/opt/ml/input/weights/")
     parser.add_argument("--model_path", type=str, default="/opt/ml/weights/fcn_resnet101_best_model.pt")
     parser.add_argument("--debug", type=str, default="False")
-    parser.add_argument("--transform",type=str, default="True")
-    parser.add_argument("--acc_steps", type=str, default="False")
-    parser.add_argument("--dataclean",type=str, default="True")
+    parser.add_argument("--transform",type=str, default="False")
+    # parser.add_argument("--acc_steps", type=str, default="False") # acc_steps 기능 추가 필요
+    # parser.add_argument("--dataclean",type=str, default="True")
 
     args = parser.parse_args()
-    if args.model == 'Pretrained_torchvision' or args.model == 'Pretrained_smp':
+    if args.model == 'Pretrained_torchvision' or 'Pretrained_smp':
         args.save_dir = os.path.join(args.save_dir, args.model_path.split('/')[-1].split('.')[0])
     else:
         args.save_dir = os.path.join(args.save_dir, args.model)

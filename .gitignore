@@ -1,2 +1,8 @@
 wandb
 __pycache__
+grad_images
+*.out
+*.sh
+*.jpg
+*.pt
+*.pth
