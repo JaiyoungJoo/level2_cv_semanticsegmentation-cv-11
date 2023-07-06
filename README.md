@@ -73,46 +73,24 @@ Given an image of hand bone, it is a matter of segmenting 29 bone parts.
 - GPU : Tesla V100 (32GB)
 
 
-# Folder Structure
-```bash
-├─eda
-├─ensemble
-├─mmdetection
-├─mmdetection3
-├─UniverseNet
-├─yolov8
-├─multilabel_kfold.py
-└─streamlit
-```
-<br></br>
-
 # Usage
 
 ## Install Requirements
 
-- `pip install -r requirements.txt`
-
-
+`pip install -r requirements.txt`
 <br></br>
+## train.py
 
-## train.sh
-1. Move the path to the tools folder where the train.sh file is located
+### command 
 
-2. Write python3 train.py command in train.sh file
-    ```bash
-    python3 train.py --model FCN --loss bce_loss --epochs 100
-    ```
-    All arguments for config training
-   ```bash
-    python3 train.py [-h] [--seed SEED] [--loss LOSS] [--model MODEL] [--epochs EPOCHS] [--val_every VAL_EVERY] [--train_batch TRAIN_BATCH] [--train_workers TRAIN_WORKERS] [--wandb WANDB] [--encoder ENCODER]
-                [--save_dir SAVE_DIR] [--model_path MODEL_PATH] [--debug DEBUG] [--transform TRANSFORM] [--acc_steps ACC_STEPS] [--dataclean DATACLEAN]
-    ```
-
-4. Run
-    ```bash
-    nohup sh train.sh
-    ```
-
+  ```bash
+  python3 train.py --model FCN --loss bce_loss --epochs 100
+  ```
+  All arguments for config training
+ ```bash
+  python3 train.py [-h] [--seed SEED] [--loss LOSS] [--model MODEL] [--epochs EPOCHS] [--val_every VAL_EVERY] [--train_batch TRAIN_BATCH] [--train_workers TRAIN_WORKERS] [--wandb WANDB] [--encoder ENCODER]
+              [--save_dir SAVE_DIR] [--model_path MODEL_PATH] [--debug DEBUG] [--transform TRANSFORM] [--acc_steps ACC_STEPS] [--dataclean DATACLEAN]
+  ```
 
 # Result
 
