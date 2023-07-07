@@ -149,6 +149,5 @@ We use HorizontalFlip,     Multiply([0.9,1,1.1,1.2]) as our final TTA combinatio
 
 ## Final Solution
 **Metric** : Dice coefficient
-![image](https://github.com/boostcampaitech5/level2_cv_semanticsegmentation-cv-11/assets/58303938/89b2b744-3c2e-4bcf-aba1-d1bd8d95d123)
 
 - Final submission : Public : 0.9743(2nd) / Private : 0.9749(2nd)
